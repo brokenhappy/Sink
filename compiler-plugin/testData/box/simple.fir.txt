@@ -1,24 +1,54 @@
 FILE: simple.kt
     package foo.bar
 
-    public final fun box(): R|kotlin/String| {
-        lval result: R|kotlin/String| = R|foo/bar/MyClass|().R|foo/bar/MyClass.foo|()
-        ^box when () {
-            ==(R|<local>/result|, String(Hello world)) ->  {
-                String(OK)
+    public abstract interface Foo : R|kotlin/Any| {
+    }
+    internal abstract interface Bar : R|kotlin/Any| {
+    }
+    public abstract interface Baz : R|kotlin/Any| {
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun foo(): R|foo/bar/Foo| {
+        ^foo object : R|foo/bar/Foo| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
             }
-            else ->  {
-                <strcat>(String(Fail: ), R|<local>/result|)
-            }
+
         }
 
     }
-FILE: __GENERATED DECLARATIONS__.kt
-    package foo.bar
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun bar(): R|foo/bar/Bar| {
+        ^bar object : R|foo/bar/Bar| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
 
-    public final class MyClass : R|kotlin/Any| {
-        public final fun foo(): R|kotlin/String|
+        }
 
-        public constructor(): R|foo/bar/MyClass|
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun baz(foo: R|foo/bar/Foo|, bar: R|foo/bar/Bar|): R|foo/bar/Baz| {
+        ^baz object : R|foo/bar/Baz| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
 
+        }
+
+    }
+    public final fun R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache|.Foo(): R|foo/bar/Foo| {
+        ^Foo this@R|foo/bar/Foo|.R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache.computeIfAbsent|<R|foo/bar/Foo|>(String(foo.bar.Foo), computeIfAbsent@fun <anonymous>(): R|foo/bar/Foo| <inline=NoInline>  {
+            ^ R|foo/bar/foo|()
+        }
+        )
+    }
+    internal final fun R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache|.Bar(): R|foo/bar/Bar| {
+        ^Bar this@R|foo/bar/Bar|.R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache.computeIfAbsent|<R|foo/bar/Bar|>(String(foo.bar.Bar), computeIfAbsent@fun <anonymous>(): R|foo/bar/Bar| <inline=NoInline>  {
+            ^ R|foo/bar/bar|()
+        }
+        )
+    }
+    public final fun R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache|.Baz(): R|foo/bar/Baz| {
+        ^Baz this@R|foo/bar/Baz|.R|org/jetbrains/kotlin/compiler/plugin/template/InjectionCache.computeIfAbsent|<R|foo/bar/Baz|>(String(foo.bar.Baz), computeIfAbsent@fun <anonymous>(): R|foo/bar/Baz| <inline=NoInline>  {
+            ^ R|foo/bar/baz|(this@R|foo/bar/Baz|.R|foo/bar/Foo|(), this@R|foo/bar/Baz|.R|foo/bar/Bar|())
+        }
+        )
     }
