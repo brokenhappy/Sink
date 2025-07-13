@@ -11,7 +11,6 @@ class SimplePluginComponentRegistrar: CompilerPluginRegistrar() {
         get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        FirExtensionRegistrarAdapter.registerExtension(SimplePluginRegistrar())
         IrGenerationExtension.registerExtension(SimpleIrGenerationExtension())
     }
 }
