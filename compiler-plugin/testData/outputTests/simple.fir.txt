@@ -1,0 +1,36 @@
+FILE: simple.kt
+    package foo.bar
+
+    public abstract interface Foo : R|kotlin/Any| {
+    }
+    internal abstract interface Bar : R|kotlin/Any| {
+    }
+    public abstract interface Baz : R|kotlin/Any| {
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun foo(): R|foo/bar/Foo| {
+        ^foo object : R|foo/bar/Foo| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun bar(): R|foo/bar/Bar| {
+        ^bar object : R|foo/bar/Bar| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() private final fun baz(foo: R|foo/bar/Foo|, bar: R|foo/bar/Bar|): R|foo/bar/Baz| {
+        ^baz object : R|foo/bar/Baz| {
+            private constructor(): R|foo/bar/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
