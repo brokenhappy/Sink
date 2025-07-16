@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.test.runners.codegen.AbstractFirBlackBoxCodegenTestB
 import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
 
-open class AbstractJvmBoxTest : AbstractFirBlackBoxCodegenTestBase(FirParser.LightTree) {
+open class AbstractJvmOutputTest : AbstractFirBlackBoxCodegenTestBase(FirParser.LightTree) {
     override fun createKotlinStandardLibrariesPathProvider(): KotlinStandardLibrariesPathProvider {
         return EnvironmentBasedStandardLibrariesPathProvider
     }
