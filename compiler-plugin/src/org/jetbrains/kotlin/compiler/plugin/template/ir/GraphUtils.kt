@@ -123,25 +123,6 @@ internal class InjectionFunctionCreationSession(
         )
         val symbol = IrSimpleFunctionSymbolImpl()
         val dependencies = graph.graph[instantiator]!!
-        val missingDependencies = dependencies.mapNotNull { dependency ->
-            when (dependency) {
-                is ResolvedDependency.MatchFound -> null
-                is ResolvedDependency.MissingDependency ->
-                    pluginContext.irFactory.createValueParameter( /** Represents: [_DocRefMissingDependencyParameter] */
-                        startOffset = instantiator.startOffset,
-                        endOffset = instantiator.endOffset,
-                        origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
-                        name = dependency.parameterName,
-                        type = dependency.type,
-                        symbol = IrValueParameterSymbolImpl(),
-                        isAssignable = false,
-                        varargElementType = null,
-                        isCrossinline = false,
-                        isNoinline = false,
-                        isHidden = false,
-                    )
-            }
-        }
 
         InjectionFunction(
             functionSymbol = symbol,
@@ -153,13 +134,30 @@ internal class InjectionFunctionCreationSession(
                 visibility = instantiator
                     .returnType
                     .getClassIds()
-                    .map {
-                        (pluginContext.referenceClass(it) ?: error("Class does not exist $it")).owner.visibility
-                    }
+                    .map { (pluginContext.referenceClass(it) ?: error("Class does not exist $it")).owner.visibility }
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = missingDependencies,
+                parameters = dependencies.mapNotNull { dependency ->
+                    when (dependency) {
+                        is ResolvedDependency.MatchFound -> null
+                        is ResolvedDependency.MissingDependency ->
+                            pluginContext.irFactory.createValueParameter(
+                                /** Represents: [_DocRefMissingDependencyParameter] */
+                                startOffset = instantiator.startOffset,
+                                endOffset = instantiator.endOffset,
+                                origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
+                                name = dependency.parameterName,
+                                type = dependency.type,
+                                symbol = IrValueParameterSymbolImpl(),
+                                isAssignable = false,
+                                varargElementType = null,
+                                isCrossinline = false,
+                                isNoinline = false,
+                                isHidden = false,
+                            )
+                    }
+                },
                 expressionCreator = { injectionCacheReceiverParameterCreator, functionDeclaration ->
                     factory.createCallExpression( /** Represents: [_DocRefComputeIfAbsent] */
                         type = instantiator.returnType,
@@ -185,7 +183,8 @@ internal class InjectionFunctionCreationSession(
                                                     startOffset = instantiator.startOffset,
                                                     endOffset = instantiator.endOffset,
                                                     type = type,
-                                                    symbol = missingDependencies.first { it.type == type }.symbol,
+                                                    symbol = functionDeclaration.parameters.first { it.type == type }.symbol,
+                                                    origin = GeneratedBySink,
                                                 )
                                             }
                                         )
@@ -325,10 +324,13 @@ private class IrFactoryWithSameOffsets(
         returnType = returnType,
         symbol = symbol,
     ).also { function ->
-        val receiverValueParameter = receiver?.let { function.createExtensionReceiver(receiver) }
-        function.extensionReceiverParameter = receiverValueParameter
-        (listOfNotNull(receiverValueParameter) + parameters).forEach {
+        val receiverValueParameter = receiver
+            ?.let { function.createExtensionReceiver(receiver) }
+            ?.also { function.extensionReceiverParameter = it }
+
+        parameters.forEach {
             function.addValueParameter(it.name, it.type, it.origin)
+            it.parent = function
         }
 
         function.body = factory.createBlockBody(startOffset, endOffset).also { body ->
@@ -369,16 +371,14 @@ private class IrFactoryWithSameOffsets(
         type = type,
         symbol = symbol,
         typeArgumentsCount = typeArguments.size,
-        valueArgumentsCount = argumentsCount + (if (extensionReceiver != null) 1 else 0), // + (if (dispatchReceiver != null) 1 else 0),
+        valueArgumentsCount = argumentsCount,
         origin = GeneratedBySink,
         superQualifierSymbol = null,
         contextParameterCount = 0,
         hasDispatchReceiver = dispatchReceiver != null,
         hasExtensionReceiver = extensionReceiver != null,
     ).also { call ->
-        call.extensionReceiver = extensionReceiver
-        call.dispatchReceiver = dispatchReceiver
-        (listOfNotNull(extensionReceiver, dispatchReceiver) + arguments).forEachIndexed { index, argument ->
+        (listOfNotNull(dispatchReceiver, extensionReceiver) + arguments).forEachIndexed { index, argument ->
             call.arguments[index] = argument
         }
         typeArguments.forEachIndexed { index, typeArgument ->
