@@ -44,11 +44,10 @@ FILE fqName:foo.bar fileName:/simple.kt
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
       $this: VALUE_PARAMETER name:<this> type:kotlin.Any
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Bar visibility:internal modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, $receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Bar
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Bar visibility:internal modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Bar
     $receiver: VALUE_PARAMETER name:$receiver type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
     BLOCK_BODY
-      RETURN type=foo.bar.Bar from='internal final fun Bar ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): foo.bar.Bar declared in foo.bar'
+      RETURN type=foo.bar.Bar from='internal final fun Bar (): foo.bar.Bar declared in foo.bar'
         CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=foo.bar.Bar origin=GeneratedBySink
           <T>: foo.bar.Bar
           $this: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in foo.bar.Bar' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
@@ -58,11 +57,10 @@ FILE fqName:foo.bar fileName:/simple.kt
               BLOCK_BODY
                 RETURN type=foo.bar.Bar from='local final fun <anonymous> (): foo.bar.Bar declared in foo.bar.Bar'
                   CALL 'private final fun bar (): foo.bar.Bar declared in foo.bar' type=foo.bar.Bar origin=GeneratedBySink
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Baz visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, $receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Baz
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Baz visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Baz
     $receiver: VALUE_PARAMETER name:$receiver type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
     BLOCK_BODY
-      RETURN type=foo.bar.Baz from='public final fun Baz ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): foo.bar.Baz declared in foo.bar'
+      RETURN type=foo.bar.Baz from='public final fun Baz (): foo.bar.Baz declared in foo.bar'
         CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=foo.bar.Baz origin=GeneratedBySink
           <T>: foo.bar.Baz
           $this: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in foo.bar.Baz' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
@@ -72,15 +70,14 @@ FILE fqName:foo.bar fileName:/simple.kt
               BLOCK_BODY
                 RETURN type=foo.bar.Baz from='local final fun <anonymous> (): foo.bar.Baz declared in foo.bar.Baz'
                   CALL 'private final fun baz (foo: foo.bar.Foo, bar: foo.bar.Bar): foo.bar.Baz declared in foo.bar' type=foo.bar.Baz origin=GeneratedBySink
-                    foo: CALL 'public final fun Foo ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): foo.bar.Foo declared in foo.bar' type=foo.bar.Foo origin=GeneratedBySink
+                    foo: CALL 'public final fun Foo (): foo.bar.Foo declared in foo.bar' type=foo.bar.Foo origin=GeneratedBySink
                       $receiver: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in foo.bar.Baz' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
-                    bar: CALL 'internal final fun Bar ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): foo.bar.Bar declared in foo.bar' type=foo.bar.Bar origin=GeneratedBySink
+                    bar: CALL 'internal final fun Bar (): foo.bar.Bar declared in foo.bar' type=foo.bar.Bar origin=GeneratedBySink
                       $receiver: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in foo.bar.Baz' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Foo visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, $receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Foo
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Foo visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:foo.bar.Foo
     $receiver: VALUE_PARAMETER name:$receiver type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
     BLOCK_BODY
-      RETURN type=foo.bar.Foo from='public final fun Foo ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): foo.bar.Foo declared in foo.bar'
+      RETURN type=foo.bar.Foo from='public final fun Foo (): foo.bar.Foo declared in foo.bar'
         CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=foo.bar.Foo origin=GeneratedBySink
           <T>: foo.bar.Foo
           $this: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in foo.bar.Foo' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink

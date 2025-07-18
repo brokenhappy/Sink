@@ -1,0 +1,150 @@
+FILE fqName:modulea fileName:/fooAndBar.kt
+  CLASS INTERFACE name:Bar modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
+    $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.Bar
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+      VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+      overridden:
+        public open fun hashCode (): kotlin.Int declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+      overridden:
+        public open fun toString (): kotlin.String declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+  CLASS INTERFACE name:Baz modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
+    $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.Baz
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+      VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+      overridden:
+        public open fun hashCode (): kotlin.Int declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+      overridden:
+        public open fun toString (): kotlin.String declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+  CLASS INTERFACE name:Buz modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
+    $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.Buz
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+      VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+      overridden:
+        public open fun hashCode (): kotlin.Int declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+      overridden:
+        public open fun toString (): kotlin.String declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+  CLASS INTERFACE name:Foo modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
+    $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.Foo
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+      VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+      overridden:
+        public open fun hashCode (): kotlin.Int declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+      overridden:
+        public open fun toString (): kotlin.String declared in kotlin.Any
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Bar visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, $receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, baz:modulea.Baz, buz:modulea.Buz) returnType:modulea.Bar
+    $receiver: VALUE_PARAMETER name:$receiver type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+    VALUE_PARAMETER name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:baz index:1 type:modulea.Baz
+    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:buz index:2 type:modulea.Buz
+    BLOCK_BODY
+      RETURN type=modulea.Bar from='public final fun Bar ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, baz: modulea.Baz, buz: modulea.Buz): modulea.Bar declared in modulea'
+        CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=modulea.Bar origin=GeneratedBySink
+          <T>: modulea.Bar
+          $this: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Bar' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+          key: CONST String type=kotlin.String value="modulea.Bar"
+          compute: FUN_EXPR type=kotlin.Function0<modulea.Bar> origin=LAMBDA
+            FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL <> () returnType:modulea.Bar
+              BLOCK_BODY
+                RETURN type=modulea.Bar from='local final fun <anonymous> (): modulea.Bar declared in modulea.Bar'
+                  CALL 'public final fun bar (foo: modulea.Foo, baz: modulea.Baz, buz: modulea.Buz): modulea.Bar declared in modulea' type=modulea.Bar origin=GeneratedBySink
+                    foo: CALL 'public final fun Foo ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): modulea.Foo declared in modulea' type=modulea.Foo origin=GeneratedBySink
+                      $receiver: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Bar' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+                    baz: GET_VAR 'baz: modulea.Baz declared in <no parent>' type=modulea.Baz origin=null
+                    buz: GET_VAR 'buz: modulea.Buz declared in <no parent>' type=modulea.Buz origin=null
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Foo visibility:public modality:FINAL <> ($receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, $receiver:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache) returnType:modulea.Foo
+    $receiver: VALUE_PARAMETER name:$receiver type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+    VALUE_PARAMETER name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+    BLOCK_BODY
+      RETURN type=modulea.Foo from='public final fun Foo ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): modulea.Foo declared in modulea'
+        CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=modulea.Foo origin=GeneratedBySink
+          <T>: modulea.Foo
+          $this: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Foo' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+          key: CONST String type=kotlin.String value="modulea.Foo"
+          compute: FUN_EXPR type=kotlin.Function0<modulea.Foo> origin=LAMBDA
+            FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL <> () returnType:modulea.Foo
+              BLOCK_BODY
+                RETURN type=modulea.Foo from='local final fun <anonymous> (): modulea.Foo declared in modulea.Foo'
+                  CALL 'public final fun foo (): modulea.Foo declared in modulea' type=modulea.Foo origin=GeneratedBySink
+  FUN name:bar visibility:public modality:FINAL <> (foo:modulea.Foo, baz:modulea.Baz, buz:modulea.Buz) returnType:modulea.Bar
+    annotations:
+      Injectable
+    VALUE_PARAMETER name:foo index:0 type:modulea.Foo
+    VALUE_PARAMETER name:baz index:1 type:modulea.Baz
+    VALUE_PARAMETER name:buz index:2 type:modulea.Buz
+    BLOCK_BODY
+      RETURN type=kotlin.Nothing from='public final fun bar (foo: modulea.Foo, baz: modulea.Baz, buz: modulea.Buz): modulea.Bar declared in modulea'
+        BLOCK type=modulea.bar.<no name provided> origin=OBJECT_LITERAL
+          CLASS CLASS name:<no name provided> modality:FINAL visibility:local superTypes:[modulea.Bar]
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.bar.<no name provided>
+            CONSTRUCTOR visibility:public <> () returnType:modulea.bar.<no name provided> [primary]
+              BLOCK_BODY
+                DELEGATING_CONSTRUCTOR_CALL 'public constructor <init> () declared in kotlin.Any'
+                INSTANCE_INITIALIZER_CALL classDescriptor='CLASS CLASS name:<no name provided> modality:FINAL visibility:local superTypes:[modulea.Bar]' type=kotlin.Unit
+            FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+              overridden:
+                public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in modulea.Bar
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+              VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+            FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+              overridden:
+                public open fun hashCode (): kotlin.Int declared in modulea.Bar
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+            FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+              overridden:
+                public open fun toString (): kotlin.String declared in modulea.Bar
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+          CONSTRUCTOR_CALL 'public constructor <init> () declared in modulea.bar.<no name provided>' type=modulea.bar.<no name provided> origin=OBJECT_LITERAL
+  FUN name:foo visibility:public modality:FINAL <> () returnType:modulea.Foo
+    annotations:
+      Injectable
+    BLOCK_BODY
+      RETURN type=kotlin.Nothing from='public final fun foo (): modulea.Foo declared in modulea'
+        BLOCK type=modulea.foo.<no name provided> origin=OBJECT_LITERAL
+          CLASS CLASS name:<no name provided> modality:FINAL visibility:local superTypes:[modulea.Foo]
+            $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:modulea.foo.<no name provided>
+            CONSTRUCTOR visibility:public <> () returnType:modulea.foo.<no name provided> [primary]
+              BLOCK_BODY
+                DELEGATING_CONSTRUCTOR_CALL 'public constructor <init> () declared in kotlin.Any'
+                INSTANCE_INITIALIZER_CALL classDescriptor='CLASS CLASS name:<no name provided> modality:FINAL visibility:local superTypes:[modulea.Foo]' type=kotlin.Unit
+            FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+              overridden:
+                public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in modulea.Foo
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+              VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+            FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+              overridden:
+                public open fun hashCode (): kotlin.Int declared in modulea.Foo
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+            FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+              overridden:
+                public open fun toString (): kotlin.String declared in modulea.Foo
+              $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+          CONSTRUCTOR_CALL 'public constructor <init> () declared in modulea.foo.<no name provided>' type=modulea.foo.<no name provided> origin=OBJECT_LITERAL

@@ -27,6 +27,7 @@ val annotationsRuntimeClasspath: Configuration by configurations.creating { isTr
 
 dependencies {
     compileOnly(kotlin("compiler"))
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0")
 
     testFixturesApi(kotlin("test-junit5"))
     testFixturesApi(kotlin("compiler-internal-test-framework"))
