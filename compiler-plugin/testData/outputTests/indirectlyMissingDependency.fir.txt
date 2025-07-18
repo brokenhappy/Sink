@@ -1,0 +1,25 @@
+FILE: indirectlyMissingDependency.kt
+    public abstract interface Foo : R|kotlin/Any| {
+    }
+    public abstract interface Bar : R|kotlin/Any| {
+    }
+    public abstract interface Baz : R|kotlin/Any| {
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun foo(bar: R|Bar|): R|Foo| {
+        ^foo object : R|Foo| {
+            private constructor(): R|<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun baz(foo: R|Foo|): R|Baz| {
+        ^baz object : R|Baz| {
+            private constructor(): R|<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }

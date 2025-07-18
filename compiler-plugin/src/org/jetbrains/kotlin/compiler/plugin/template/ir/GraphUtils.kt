@@ -122,7 +122,6 @@ internal class InjectionFunctionCreationSession(
             endOffset = instantiator.endOffset,
         )
         val symbol = IrSimpleFunctionSymbolImpl()
-        val dependencies = graph.graph[instantiator]!!
 
         InjectionFunction(
             functionSymbol = symbol,
@@ -138,25 +137,20 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = dependencies.mapNotNull { dependency ->
-                    when (dependency) {
-                        is ResolvedDependency.MatchFound -> null
-                        is ResolvedDependency.MissingDependency ->
-                            pluginContext.irFactory.createValueParameter(
-                                /** Represents: [_DocRefMissingDependencyParameter] */
-                                startOffset = instantiator.startOffset,
-                                endOffset = instantiator.endOffset,
-                                origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
-                                name = dependency.parameterName,
-                                type = dependency.type,
-                                symbol = IrValueParameterSymbolImpl(),
-                                isAssignable = false,
-                                varargElementType = null,
-                                isCrossinline = false,
-                                isNoinline = false,
-                                isHidden = false,
-                            )
-                    }
+                parameters = graph.allMissingDependenciesOf(instantiator).map { dependency ->
+                    pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefMissingDependencyParameter] */
+                        startOffset = instantiator.startOffset,
+                        endOffset = instantiator.endOffset,
+                        origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
+                        name = dependency.parameterName,
+                        type = dependency.type,
+                        symbol = IrValueParameterSymbolImpl(),
+                        isAssignable = false,
+                        varargElementType = null,
+                        isCrossinline = false,
+                        isNoinline = false,
+                        isHidden = false,
+                    )
                 },
                 expressionCreator = { injectionCacheReceiverParameterCreator, functionDeclaration ->
                     factory.createCallExpression( /** Represents: [_DocRefComputeIfAbsent] */
@@ -172,7 +166,7 @@ internal class InjectionFunctionCreationSession(
                                 expression = factory.createCallExpression( /** Represents: [_DocRefInstantiatorCall] */
                                     type = instantiator.returnType,
                                     symbol = instantiator.symbol as IrSimpleFunctionSymbol,
-                                    arguments = dependencies.map { dependency ->
+                                    arguments = graph.graph[instantiator]!!.map { dependency ->
                                         createDependencyProvidingArgument(
                                             dependency,
                                             graph,
@@ -216,17 +210,15 @@ internal class InjectionFunctionCreationSession(
                     graph,
                 ).functionSymbol,
                 extensionReceiver = injectionCacheReceiverParameterCreator(), /** Represents: [_DocRefThisValue] */
-                arguments = graph
-                    .graph[dependency.instantiatorFunction]
-                    ?.map { subDependency ->
-                        createDependencyProvidingArgument(
-                            subDependency,
-                            graph,
-                            factory,
-                            injectionCacheReceiverParameterCreator,
-                            getParameterValueByType,
-                        )
-                    } ?: emptyList(),
+                arguments = graph.allMissingDependenciesOf(dependency.instantiatorFunction).map { subDependency ->
+                    createDependencyProvidingArgument(
+                        subDependency,
+                        graph,
+                        factory,
+                        injectionCacheReceiverParameterCreator,
+                        getParameterValueByType,
+                    )
+                }
                 // TODO: Support generics
             )
     }
@@ -442,7 +434,7 @@ private fun IrType.getClassIds(): List<ClassId> = buildList {
 
 
 /** This key is used to identify the injectable in the injection cache */
-private fun IrType.toCacheKey(): String = when (this) {
+internal fun IrType.toCacheKey(): String = when (this) {
     is IrDynamicType -> TODO()
     is IrErrorType -> TODO()
     is IrSimpleType -> ((classifier.owner as? IrDeclarationWithName)?.fqNameWhenAvailable?.asString() ?: "Unknown") +
@@ -461,4 +453,4 @@ internal fun IrSimpleType.typeArgumentsToString(
         it.typeOrNull?.let(typeToString) ?: "Unknown"
     }
 
-object SinkPluginKey: GeneratedDeclarationKey()
+internal object SinkPluginKey: GeneratedDeclarationKey()
