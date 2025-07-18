@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.ir.expressions.IrConstantPrimitive
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.addChild
+import org.jetbrains.kotlin.ir.util.callableId
 import org.jetbrains.kotlin.ir.util.file
 import org.jetbrains.kotlin.ir.util.fileOrNull
 import org.jetbrains.kotlin.ir.util.functions
@@ -71,16 +72,26 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
             injectionCacheComputeIfAbsentMethodSymbol = injectableCacheInterface.functions.first().owner.symbol,
         )
 
-        graphWithoutIssues.graph.keys.forEach { injectable ->
-            injectable.file.addChild(
-                creationSession.generateInjectionFunction(injectable, graphWithoutIssues)
-            )
+        data class InjectableAndInjectionFunction(val injectable: IrFunction, val injectionFunction: IrSimpleFunction)
+
+        val injectablesAndTheirInjectionFunctions = graphWithoutIssues
+            .graph
+            .keys
+            .map { injectable ->
+                InjectableAndInjectionFunction(
+                    injectable = injectable,
+                    injectionFunction = creationSession.generateInjectionFunction(injectable, graphWithoutIssues),
+                )
+            }
+
+        // Now persist the generated declarations
+        injectablesAndTheirInjectionFunctions.forEach { (injectable, injectionFunction) ->
+            injectable.file.addChild(injectionFunction)
         }
     }
 }
 
 private fun MessageCollector.reportErrorsForCycle(cycle: List<IrFunction>) {
-
     cycle.singleOrNull()?.let { selfDependingInjectable ->
         report(
             CompilerMessageSeverity.ERROR,
@@ -93,7 +104,7 @@ private fun MessageCollector.reportErrorsForCycle(cycle: List<IrFunction>) {
     cycle
         .filter { it.isInCurrentModule() }
         .forEach { cycleElement ->
-            val shiftedCycle = cycle.startingWith(cycleElement)
+            val shiftedCycle = cycle.shiftedSoThatItStartsWith(cycleElement)
             report(
                 CompilerMessageSeverity.ERROR,
                 "Dependency cycle found: ${
@@ -110,28 +121,29 @@ private fun MessageCollector.reportErrorsForCycle(cycle: List<IrFunction>) {
         }
 }
 
+// TODO: Introduce error for ambiguous type dependency
+// TODO: IDE idea: If IDE sees someone reference ambiguous type. But it can be disambiguated with narrower type, propose the fix.
+
 private fun MessageCollector.reportErrorsForDuplicates(duplicates: List<IrFunction>) {
+    // TODO: Handle duplicates exclusively defined in external modules
     duplicates
         .filter { it.isInCurrentModule() }
         .forEach { duplication ->
-            val shiftedCycle = duplicates.startingWith(duplication)
             report(
                 CompilerMessageSeverity.ERROR,
-                "Dependency cycle found: ${
-                    shiftedCycle.joinToString(" -> ") { it.returnType.render() }
-                }. Remove this argument ${
-                    if (shiftedCycle.last().isInCurrentModule()) ""
-                    else ", or make sure ${shiftedCycle.last().returnType.render()} does not depend on this"
-                }${
-                    if (shiftedCycle.size < 3) ""
-                    else ", or break the cycle elsewhere"
-                }",
+                "Multiple injectables found with the same return type: ${
+                    duplicates
+                        .map { it.callableId.callableName }
+                        .takeIf { it.size == it.toSet().size }
+                        .let { it ?: duplicates.map { it.callableId.asFqNameForDebugInfo() } }
+                        .joinToString(", ")
+                }. Only one is allowed for a single type.", // TODO: Message that they might be able to remove declaration, or otherwise module?
                 duplication.getCompilerMessageLocation(duplication.file),
             )
         }
 }
 
-fun <T> List<T>.startingWith(startElement: T): List<T> =
+fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
     listOf(startElement) +
         dropWhile { it != startElement } +
         takeWhile { it != startElement }
@@ -154,11 +166,41 @@ private fun IrPluginContext.referenceAllInjectablesDeclaredInDependencyModulesOf
         }
     }
 
-internal sealed class GraphBuildResult {
-    class NoIssues(val graph: Map<IrFunction, List<ResolvedDependency>>): GraphBuildResult()
-    class CyclesFound(val cycles: List<List<IrFunction>>): GraphBuildResult()
-    class DuplicatesFound(val duplicates: List<List<IrFunction>>): GraphBuildResult()
+internal typealias GraphMap = Map<IrFunction, List<ResolvedDependency>>
+
+internal fun GraphMap.mapDependenciesRecursivelyMemoized(
+    mapper: (
+        function: IrFunction,
+        oldDependencies: List<ResolvedDependency>,
+        recurse: (IrFunction) -> List<ResolvedDependency>,
+    ) -> List<ResolvedDependency>,
+): GraphMap {
+    val newMap = HashMap<IrFunction, List<ResolvedDependency>>(this.size)
+    val visited = HashSet<IrFunction>()
+    fun recurse(irFunction: IrFunction): List<ResolvedDependency> {
+        return newMap.computeIfAbsent(irFunction) {
+            val dependencies = this[irFunction]!!
+            if (!visited.add(irFunction)) dependencies // Uh-oh! We encountered a cycle. In theory that might be introduced this mapping operation. We will just return the old values
+            else mapper(irFunction, dependencies, ::recurse)
+        }
+    }
+
+    return mapValues { (it, _) -> recurse(it) }
 }
+
+internal sealed class GraphBuildResult {
+    data class NoIssues(val graph: GraphMap): GraphBuildResult()
+    data class CyclesFound(val cycles: List<List<IrFunction>>): GraphBuildResult()
+    data class DuplicatesFound(val duplicates: List<List<IrFunction>>): GraphBuildResult()
+}
+
+private fun List<ResolvedDependency>.allMissingDependencies(): List<ResolvedDependency.MissingDependency> =
+    flatMap { dependency ->
+        when (dependency) {
+            is ResolvedDependency.MatchFound -> dependency.indirectDependencies.allMissingDependencies()
+            is ResolvedDependency.MissingDependency -> listOf(dependency)
+        }
+    }
 
 internal fun GraphBuildResult.mapSuccess(
     transform: (GraphBuildResult.NoIssues) -> GraphBuildResult
@@ -169,13 +211,22 @@ internal fun GraphBuildResult.mapSuccess(
 }
 
 internal sealed class ResolvedDependency {
-    data class MatchFound(val parameterName: Name, val instantiatorFunction: IrFunction): ResolvedDependency()
+    data class MatchFound(
+        val parameterName: Name,
+        val instantiatorFunction: IrFunction,
+        val indirectDependencies: List<ResolvedDependency>,
+    ): ResolvedDependency()
     data class MissingDependency(val parameterName: Name, val type: IrType): ResolvedDependency()
 }
 
-internal fun ResolvedDependency.typeOrNull(): IrType? = when (this) {
-    is ResolvedDependency.MissingDependency -> type
-    is ResolvedDependency.MatchFound -> null
+internal val ResolvedDependency.parameterName: Name get() = when (this) {
+    is ResolvedDependency.MissingDependency -> parameterName
+    is ResolvedDependency.MatchFound -> parameterName
+}
+
+internal fun ResolvedDependency.withParameterName(newName: Name): ResolvedDependency = when (this) {
+    is ResolvedDependency.MissingDependency -> copy(parameterName = newName)
+    is ResolvedDependency.MatchFound -> copy(parameterName = newName)
 }
 
 /** @return false if there were no issues and we can continue normally */
@@ -186,7 +237,7 @@ private fun List<IrFunction>.buildGraph(
     this@buildGraph.forEach { function ->
         this[function] = function.parameters.map { parameter ->
             accessibleInjectables.pickBestCandidateToProvide(parameter.type)
-                ?.let {ResolvedDependency.MatchFound(parameter.name, it) }
+                ?.let { ResolvedDependency.MatchFound(parameter.name, it, indirectDependencies = emptyList()) }
                 ?: ResolvedDependency.MissingDependency(parameter.name, parameter.type)
         }
     }
@@ -195,57 +246,112 @@ private fun List<IrFunction>.buildGraph(
     .withIndirectMissingDependencies(moduleFragment)
     .detectingDuplicates(accessibleInjectables)
 
+/**
+ * // Module A
+ *
+ * fun foo(Baz, Bar): Foo
+ *
+ * // foo -> [
+ * //   MissingDependency(Baz),
+ * //   MissingDependency(Bar),
+ * // ]
+ * fun DependencyCache.Foo(Baz, Bar): Foo
+ *
+ * // Module B
+ *
+ * fun bar(Baz, Foobs): Bar
+ *
+ * // bar -> [
+ * //   MissingDependency(Baz),
+ * //   MissingDependency(Foobs),
+ * // ]
+ * fun DependencyCache.Bar(Baz, Foobs): Bar
+ *
+ * // Module C
+ *
+ * fun baz(Foobs): Baz
+ *
+ * fun bla(Foo): Bla
+ *
+ * // baz -> [
+ * //   MissingDependency(Foobs),
+ * // ]
+ * // bla -> [
+ * //   MatchFound(Baz, [MissingDependency(Foobs)])
+ * //   MatchFound(Bar, [MatchFound(Baz, [MissingDependency(Foobs)]), MissingDependency(Foobs)])
+ * // ]
+ * fun DependencyCache.Bla(foobs: Foobs): Bla = bla(
+ *   Foo(
+ *     Baz(
+ *       foobs,
+ *     ),
+ *     Bar(
+ *       Baz(foobs)
+ *       foobs
+ *     )
+ *   )
+ * )
+ */
 private fun GraphBuildResult.withIndirectMissingDependencies(
     moduleFragment: IrModuleFragment
 ): GraphBuildResult = mapSuccess { graphWithoutIssues ->
-    val newGraph = graphWithoutIssues.graph.mapValues { (_, dependencies) -> dependencies.toMutableList() }
-    fun GraphBuildResult.NoIssues.addDepthFirstToNewMapAndReturnMissingDependencies(
-        function: IrFunction,
-    ): List<ResolvedDependency.MissingDependency> =
-        graphWithoutIssues.graph[function]?.flatMap { dependency ->
-            when (dependency) {
-                is ResolvedDependency.MatchFound -> {
-                    val isModuleCrossingDependency = !dependency.instantiatorFunction.isDeclaredIn(moduleFragment)
-                        && function.isDeclaredIn(moduleFragment)
-                    // TODO: If we support more narrow scoped injectables. We should handle it here? Kinda similar to module border crossing
-                    addDepthFirstToNewMapAndReturnMissingDependencies(dependency.instantiatorFunction)
-                        .mapNotNull { indirectDependency ->
-                            if (isModuleCrossingDependency) {
-                                // Try to resolve the dependency in our own module!
-                                graphWithoutIssues
-                                    .graph
-                                    .keys
-                                    .pickBestCandidateToProvide(indirectDependency.type) // Try to resolve within this module
-                                    ?.let { candidateFromThisModule ->
-                                        // Yay! We were able to resolve a dependency more locally (in module) than the module that declared it
-                                        val currentDeps = newGraph[function]!!
-                                        if (currentDeps.none { it.typeOrNull() == indirectDependency.type }) {
-                                            // TODO: Handle parameter name duplication
-                                            // After making sure that we're not already in the dependencies, we can add the new one
-                                            currentDeps += ResolvedDependency.MatchFound(
-                                                parameterName = indirectDependency.parameterName,
-                                                instantiatorFunction = candidateFromThisModule,
-                                            )
-                                        }
-                                        return@mapNotNull null // So we don't need to handle it in our usages anymore.
-                                    } ?: indirectDependency
-                            } else {
-                                indirectDependency
-                            }
-                        }
-                }
-                is ResolvedDependency.MissingDependency -> listOf(
-                    ResolvedDependency.MissingDependency(dependency.parameterName, dependency.type),
+    graphWithoutIssues.copy(graph = graphWithoutIssues.graph.mapDependenciesRecursivelyMemoized { function, dependencies, recurse ->
+        // TODO: If we support more narrow scoped injectables. We should handle it here? Kinda similar to module border crossing
+        val names = mutableSetOf<Name>()
+        fun List<ResolvedDependency>.resolvingCrossModuleDependencies(
+            moduleThatResolvedThisDependency: IrModuleFragment?,
+        ): List<ResolvedDependency> = mapNotNull { indirectDependency ->
+            when (indirectDependency) {
+                is ResolvedDependency.MatchFound -> indirectDependency.copy(
+                    indirectDependencies = recurse(indirectDependency.instantiatorFunction)
+                        .resolvingCrossModuleDependencies(indirectDependency.instantiatorFunction.moduleFragment),
                 )
+                is ResolvedDependency.MissingDependency -> {
+                    if (moduleThatResolvedThisDependency != moduleFragment) {
+                        // The original declaration that depended on this could not resolve this dependency.
+                        // However, we are a different module. We can try again!
+
+                        // TODO: First: It might be that the user (perhaps unknowingly) added
+                        // TODO: the indirect missing dependency to their own dependencies already (Removed the logic, needs verification)
+                        graphWithoutIssues
+                            .graph
+                            .keys
+                            .pickBestCandidateToProvide(indirectDependency.type)
+                            ?.let { candidateFromThisModule ->
+                                // Yay! We were able to resolve a dependency unlike the original module that declared it
+                                // Okay, so far we know that:
+                                //  - One of our dependencies was:
+                                //    - From another module
+                                //    - Had a dependency that it was not able to satisfy in
+                                //      their own module (AKA, missing dependency)
+                                //    - We were able to satisfy this dependency in our own module
+                                // The newly added dependency might again have its own missing dependencies.
+                                // So we recurse down its missing dependencies as well.
+                                ResolvedDependency.MatchFound(
+                                    parameterName = indirectDependency.parameterName,
+                                    instantiatorFunction = candidateFromThisModule,
+                                    indirectDependencies = recurse(candidateFromThisModule)
+                                        .resolvingCrossModuleDependencies(candidateFromThisModule.moduleFragment),
+                                )
+                            } ?: indirectDependency
+                    } else {
+                        indirectDependency
+                    }
+                }
             }
-        } ?: emptyList()
+        }.map { dependency ->
+            if (names.add(dependency.parameterName)) dependency
+            else generateSequence(0) { it + 1 }
+                .map { Name.identifier(dependency.parameterName.asString() + it) }
+                .first { names.add(it) }
+                .let { dependency.withParameterName(it) }
+        }
 
-    graphWithoutIssues.graph.keys.forEach { graphWithoutIssues.addDepthFirstToNewMapAndReturnMissingDependencies(it) }
-
-    GraphBuildResult.NoIssues(newGraph)
+        dependencies.resolvingCrossModuleDependencies(function.moduleFragment)
+    })
 }
 
-internal fun IrDeclaration.isDeclaredIn(module: IrModuleFragment): Boolean = this.fileOrNull?.module == module
+private val IrDeclaration.moduleFragment: IrModuleFragment? get() = this.fileOrNull?.module
 
 private fun GraphBuildResult.detectingDuplicates(accessibleInjectables: List<IrFunction>): GraphBuildResult =
     mapSuccess { graphWithoutIssues ->
@@ -257,7 +363,7 @@ private fun GraphBuildResult.detectingDuplicates(accessibleInjectables: List<IrF
             .ifEmpty { null }
             ?.let { duplicateTypes ->
                 GraphBuildResult.DuplicatesFound(duplicateTypes.map {
-                    type -> graphWithoutIssues.graph.keys.filter { it.returnType == type }
+                        type -> graphWithoutIssues.graph.keys.filter { it.returnType == type }
                 })
             }
             ?: this
@@ -297,14 +403,14 @@ private fun IrPluginContext.referenceMetadataFromModuleOrNullIfItsNotSinkModule(
     module: ModuleDescriptor,
 ): SinkModuleMetadata? {
     val moduleName = module.stableName ?: module.name
-    val callableId = module.getMetadataPropertyId()
-    val metadataProperty = referenceProperties(callableId)
+    val callableId = module.getMetadataFunctionId()
+    val metadataFunction = referenceFunctions(callableId)
         .singleOrNull() ?: run {
-            // TODO: Log?
-            return null
-        }
+        // TODO: Log?
+        return null
+    }
 
-    metadataProperty
+    metadataFunction
         .owner
         .annotations
         .firstOrNull()
@@ -323,8 +429,8 @@ private fun IrPluginContext.referenceMetadataFromModuleOrNullIfItsNotSinkModule(
     TODO()
 }
 
-private fun ModuleDescriptor.getMetadataPropertyId(): CallableId {
-    val moduleNameAsPackageName = (stableName ?: this.name).identifier.asValidJavaIdentifier()
+private fun ModuleDescriptor.getMetadataFunctionId(): CallableId {
+    val moduleNameAsPackageName = (stableName ?: this.name).asString().asValidJavaIdentifier()
     return CallableId(
         packageName = FqName("$moduleNameAsPackageName.__sink_metadata__"),
         className = null,
