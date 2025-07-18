@@ -1,0 +1,67 @@
+Module: modulea
+FILE: fooAndBar.kt
+    package modulea
+
+    public abstract interface Foo : R|kotlin/Any| {
+    }
+    public abstract interface Bar : R|kotlin/Any| {
+    }
+    public abstract interface Baz : R|kotlin/Any| {
+    }
+    public abstract interface Buz : R|kotlin/Any| {
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun foo(): R|modulea/Foo| {
+        ^foo object : R|modulea/Foo| {
+            private constructor(): R|modulea/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun bar(foo: R|modulea/Foo|, baz: R|modulea/Baz|, buz: R|modulea/Buz|): R|modulea/Bar| {
+        ^bar object : R|modulea/Bar| {
+            private constructor(): R|modulea/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+Module: moduleb
+FILE: bazFoobsAndBarbs.kt
+    package moduleb
+
+    public abstract interface Foobs : R|kotlin/Any| {
+    }
+    public abstract interface Barbs : R|kotlin/Any| {
+    }
+    public abstract interface Bazbs : R|kotlin/Any| {
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun baz(foo: R|modulea/Foo|, bazbs: R|moduleb/Bazbs|): R|modulea/Baz| {
+        ^baz object : R|modulea/Baz| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun foobs(foo: R|modulea/Foo|): R|moduleb/Foobs| {
+        ^foobs object : R|moduleb/Foobs| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
+    @R|org/jetbrains/kotlin/compiler/plugin/template/Injectable|() public final fun barbs(bar: R|modulea/Bar|, foobs: R|moduleb/Foobs|, bazbs: R|moduleb/Bazbs|): R|moduleb/Barbs| {
+        ^barbs object : R|moduleb/Barbs| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+
+    }
