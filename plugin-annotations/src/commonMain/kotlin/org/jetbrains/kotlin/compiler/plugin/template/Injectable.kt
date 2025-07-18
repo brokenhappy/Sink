@@ -1,5 +1,6 @@
 package org.jetbrains.kotlin.compiler.plugin.template
 
+@Retention(AnnotationRetention.BINARY)
 public annotation class Injectable
 
 public interface InjectionCache {
