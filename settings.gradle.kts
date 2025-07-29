@@ -17,3 +17,4 @@ rootProject.name = "compiler-plugin-template"
 include("compiler-plugin")
 include("gradle-plugin")
 include("plugin-annotations")
+include("ide-and-compiler-plugin-common-code")
