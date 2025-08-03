@@ -439,8 +439,8 @@ private fun <TypeExpression, TypeSymbol, FunctionSymbol> Iterable<FunctionSymbol
         val returnType = injectable.returnType
         if (!behavior.isSubtype(returnType, type)) continue
         if (singleCandidate != null) {
-            multipleCandidates = multipleCandidates ?: mutableListOf()
-            multipleCandidates.add(singleCandidate)
+            multipleCandidates = multipleCandidates ?: mutableListOf(singleCandidate)
+            multipleCandidates.add(injectable)
         } else {
             singleCandidate = injectable
         }
