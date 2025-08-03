@@ -431,26 +431,7 @@ internal fun <TypeExpression, FunctionSymbol, TypeSymbol> Map<TypeSymbol, List<F
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, behavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
 private fun <TypeExpression, TypeSymbol, FunctionSymbol> Iterable<FunctionSymbol>.pickCandidatesToProvide(
     type: TypeExpression
-): List<FunctionSymbol> {
-    // Micro optimization to prevent unnecessary allocations for the common single or zero matches case
-    var singleCandidate: FunctionSymbol? = null
-    var multipleCandidates: MutableList<FunctionSymbol>? = null
-    for (injectable in this) {
-        val returnType = injectable.returnType
-        if (!behavior.isSubtype(returnType, type)) continue
-        if (singleCandidate != null) {
-            multipleCandidates = multipleCandidates ?: mutableListOf(singleCandidate)
-            multipleCandidates.add(injectable)
-        } else {
-            singleCandidate = injectable
-        }
-    }
-    return when {
-        singleCandidate == null -> emptyList() // Optimization path for zero matches
-        multipleCandidates == null -> listOf(singleCandidate) // Optimization path for a single match
-        else -> multipleCandidates // Ambiguous
-    }
-}
+): List<FunctionSymbol> = filterLikelySingle { injectable -> behavior.isSubtype(injectable.returnType, type) }
 
 class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
     val injectables: Map<FunctionSymbol, List<ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>>>,
@@ -472,6 +453,26 @@ private fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R> = whe
     0 -> emptyList()
     1 -> listOf(mapper(first()))
     else -> mapTo(ArrayList(size), mapper)
+}
+
+/** Tries to reduce allocations for filter operations that are likely to zero or one item */
+private inline fun <T> Iterable<T>.filterLikelySingle(predicate: (T) -> Boolean): List<T> {
+    var singleResult: T? = null
+    var multipleResult: MutableList<T>? = null
+    for (element in this) {
+        if (!predicate(element)) continue
+        if (singleResult != null) {
+            multipleResult = multipleResult ?: mutableListOf(singleResult)
+            multipleResult.add(element)
+        } else {
+            singleResult = element
+        }
+    }
+    return when {
+        singleResult == null -> emptyList()
+        multipleResult == null -> listOf(singleResult)
+        else -> multipleResult
+    }
 }
 
 context(behavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
