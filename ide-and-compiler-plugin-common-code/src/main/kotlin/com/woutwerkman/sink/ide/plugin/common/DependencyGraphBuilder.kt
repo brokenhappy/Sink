@@ -1,11 +1,15 @@
 package com.woutwerkman.sink.ide.plugin.common
 
 import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder.ResolvedDependency
+import java.io.ByteArrayOutputStream
 import java.util.*
 import kotlin.collections.List
 import kotlin.collections.associateWith
 import kotlin.collections.emptyList
 
+context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
+fun <TypeExpression, FunctionSymbol, TypeSymbol> DependencyGraphBuilder(
+): DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol> = DependencyGraphBuilder(functionBehavior, typeBehavior)
 
 class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
     val functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
@@ -47,23 +51,11 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             .detectingDuplicates(moduleDependencyGraphs)
     }
 
-    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
+    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, _: TypeBehavior<TypeExpression, TypeSymbol, *>)
     private fun List<FunctionSymbol>.asSupertypeMap(): Map<TypeSymbol, MutableList<FunctionSymbol>> =
         buildMap {
             this@asSupertypeMap.forEach { injectable ->
-                typeBehavior
-                    .asConcreteType(injectable.returnType)
-                    ?.symbol
-                    ?.also { symbol ->
-                        getOrPut(symbol) { mutableListOf() } += injectable
-                        this[symbol] = mutableListOf(injectable)
-                    }
-                    ?.let { symbol -> typeBehavior.superTypesOfWithoutAny(symbol) }
-                    ?.forEach { superType ->
-                        getOrPut(
-                            typeBehavior.asConcreteType(superType)!!.symbol
-                        ) { mutableListOf() } += injectable
-                    }
+                addSupertypesOf(injectable)
             }
         }
 
@@ -274,35 +266,26 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
     }
 }
 
-/**
- * Instantiator functions are the user-defined functions annotated with @Injectable.
- * Instantiator functions are an implementation detail of a module,
- * and thus are not used in a module's dependency graph.
- */
-private typealias InstantiatorFunctionsDocRef = Nothing
-
-/** Injector functions are those generated as extension functions of DependencyCache. */
-private typealias InjectorFunctionDocRef = Any
-
-interface FunctionBehavior<TypeExpression, FunctionSymbol> {
-    fun getReturnTypeOf(injectable: FunctionSymbol): TypeExpression
-    fun getFqnOfInjectionFunctionOf(injectable: FunctionSymbol): String
-    fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, TypeExpression>>
-    /** Only used as equatable to other results of [getModuleOf] */
-    fun getModuleOf(injectable: FunctionSymbol): Any?
+context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
+private fun <
+    FunctionSymbol,
+    TypeExpression,
+    TypeSymbol
+> MutableMap<TypeSymbol, MutableList<FunctionSymbol>>.addSupertypesOf(injectable: FunctionSymbol) {
+    typeBehavior
+        .asConcreteType(injectable.returnType)
+        ?.symbol
+        ?.also { symbol ->
+            getOrPut(symbol) { mutableListOf() } += injectable
+            this[symbol] = mutableListOf(injectable)
+        }
+        ?.let { symbol -> typeBehavior.superTypesOfWithoutAny(symbol) }
+        ?.forEach { superType ->
+            getOrPut(
+                typeBehavior.asConcreteType(superType)!!.symbol
+            ) { mutableListOf() } += injectable
+        }
 }
-
-context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
-private val <TypeExpression, FunctionSymbol> FunctionSymbol.parameters: List<Pair<String, TypeExpression>> get() = functionBehavior.getParametersOf(this)
-
-context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
-private val <TypeExpression, FunctionSymbol> FunctionSymbol.injectionFunctionFqn: String get() = functionBehavior.getFqnOfInjectionFunctionOf(this)
-
-context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
-private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpression get() = functionBehavior.getReturnTypeOf(this)
-
-context(functionBehavior: FunctionBehavior<*, FunctionSymbol>)
-private val <FunctionSymbol> FunctionSymbol.module: Any? get() = functionBehavior.getModuleOf(this)
 
 data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
     val instantiatorFunctionsToDependencies: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>,
@@ -325,7 +308,7 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
     fun findCandidatesForType(type: TypeExpression): List<FunctionSymbol> =
         superTypesMap
             .findCandidatesThatProvide(type)
-            .plusLikelyEmpty(moduleDependencyGraphs.findInjectorsForType(type))
+            .plusLikelyEmpty(moduleDependencyGraphs.flatMapLikelySingle { it.findCandidatesThatProvide(type) })
 
     interface DependencyRecursionContext<FunctionSymbol, TypeExpression> {
         fun recurse(symbol: FunctionSymbol): List<ResolvedDependency<TypeExpression, FunctionSymbol>>
@@ -357,7 +340,109 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
                 instantiatorFunctionsToDependencies.mapValues { (it, _) -> recursionContext.recurse(it) },
         )
     }
+
+    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
+    fun serializeAsModuleDependencyGraph(): ByteArray {
+        val buffer = ByteArrayOutputStream(instantiatorFunctionsToDependencies.size * 32)
+        buffer.writeInt(instantiatorFunctionsToDependencies.size)
+        for (injectable in instantiatorFunctionsToDependencies.keys) {
+            val fqnBytes = injectable.injectionFunctionFqn.toByteArray()
+            buffer.writeInt(fqnBytes.size)
+            buffer.write(fqnBytes)
+        }
+        return buffer.toByteArray()
+    }
 }
+
+context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, _: TypeBehavior<TypeExpression, TypeSymbol, *>)
+fun <FunctionSymbol, TypeExpression, TypeSymbol> moduleDependencyGraphFromBytes(
+    functionResolver: (fqnOfInjector: String) -> FunctionSymbol,
+    bytes: ByteArray,
+): ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol> {
+    val size = bytes.readIntAt(0)
+    var currentOffset = 4
+    val supertypeMap = mutableMapOf<TypeSymbol, MutableList<FunctionSymbol>>()
+    val injectables = buildMap {
+        repeat(size) {
+            val fqnSize = bytes.readIntAt(currentOffset).also { currentOffset += 4 }
+            val fqn = bytes.decodeToString(currentOffset, currentOffset + fqnSize).also { currentOffset += fqnSize }
+            val injector = functionResolver(fqn)
+            this[injector] = injector.parameters.map { (name, type) ->
+                ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>(name, type)
+            }
+            supertypeMap.addSupertypesOf(injector)
+        }
+    }
+    return ModuleDependencyGraph(injectables, supertypeMap)
+}
+
+class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
+    val injectables: Map<FunctionSymbol, List<ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>>>,
+    val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
+) {
+    context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
+    fun findCandidatesThatProvide(type: TypeExpression): List<FunctionSymbol> =
+        typeBehavior
+            .asConcreteType(type)
+            ?.symbol
+            ?.let { typeSymbol -> superTypesMap[typeSymbol]}
+            ?.pickCandidatesToProvide(type)
+            ?: emptyList()
+}
+
+private fun ByteArrayOutputStream.writeInt(size: Int) {
+    write(size and 0xFF)
+    write((size shr 8) and 0xFF)
+    write((size shr 16) and 0xFF)
+    write((size shr 24) and 0xFF)
+}
+
+private fun <TypeExpression, FunctionSymbol> List<ResolvedDependency<TypeExpression, FunctionSymbol>>.forEachMissingDependencyRecursive(
+    function: (ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>) -> Unit,
+) {
+    forEach { dependency ->
+        when (dependency) {
+            is ResolvedDependency.MatchFound -> dependency.indirectDependencies.forEachMissingDependencyRecursive(function)
+            is ResolvedDependency.MissingDependency -> function(dependency)
+        }
+    }
+}
+
+private fun ByteArray.readIntAt(i: Int): Int =
+    this[i].toInt() +
+        this[i + 1].toInt().shr(8) +
+        this[i + 2].toInt().shr(16) +
+        this[i + 3].toInt().shr(24)
+
+/**
+ * Instantiator functions are the user-defined functions annotated with @Injectable.
+ * Instantiator functions are an implementation detail of a module,
+ * and thus are not used in a module's dependency graph.
+ */
+private typealias InstantiatorFunctionsDocRef = Nothing
+
+/** Injector functions are those generated as extension functions of DependencyCache. */
+private typealias InjectorFunctionDocRef = Any
+
+interface FunctionBehavior<TypeExpression, FunctionSymbol> {
+    fun getReturnTypeOf(injectable: FunctionSymbol): TypeExpression
+    fun getFqnOfInjectionFunctionOf(injectable: FunctionSymbol): String
+    fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, TypeExpression>>
+    /** Only used as equatable to other results of [getModuleOf] */
+    fun getModuleOf(injectable: FunctionSymbol): Any?
+}
+
+context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
+private val <TypeExpression, FunctionSymbol> FunctionSymbol.parameters: List<Pair<String, TypeExpression>> get() = functionBehavior.getParametersOf(this)
+
+context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
+private val <TypeExpression, FunctionSymbol> FunctionSymbol.injectionFunctionFqn: String get() = functionBehavior.getFqnOfInjectionFunctionOf(this)
+
+context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
+private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpression get() = functionBehavior.getReturnTypeOf(this)
+
+context(functionBehavior: FunctionBehavior<*, FunctionSymbol>)
+private val <FunctionSymbol> FunctionSymbol.module: Any? get() = functionBehavior.getModuleOf(this)
 
 private fun <T> List<T>.plusLikelyEmpty(other: List<T>): List<T> = when {
     other.isEmpty() -> this
@@ -400,20 +485,6 @@ private fun <TypeExpression, TypeSymbol, FunctionSymbol> Iterable<FunctionSymbol
     type: TypeExpression
 ): List<FunctionSymbol> = filterLikelySingle { injectable -> behavior.isSubtype(injectable.returnType, type) }
 
-class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
-    val injectables: Map<FunctionSymbol, List<ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>>>,
-    val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
-) {
-    context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    fun findCandidatesThatProvide(type: TypeExpression): List<FunctionSymbol> =
-        typeBehavior
-            .asConcreteType(type)
-            ?.symbol
-            ?.let { typeSymbol -> superTypesMap[typeSymbol]}
-            ?.pickCandidatesToProvide(type)
-            ?: emptyList()
-}
-
 private inline fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R> = when (size) {
     0 -> emptyList()
     1 -> listOf(mapper(first()))
@@ -439,13 +510,3 @@ private inline fun <T> Iterable<T>.filterLikelySingle(predicate: (T) -> Boolean)
         else -> multipleResult
     }
 }
-
-context(behavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-internal fun <
-    FunctionSymbol,
-    TypeExpression,
-    TypeSymbol
-> List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>>.findInjectorsForType(
-    type: TypeExpression,
-): List<FunctionSymbol> =
-    flatMapLikelySingle { it.findCandidatesThatProvide(type) }

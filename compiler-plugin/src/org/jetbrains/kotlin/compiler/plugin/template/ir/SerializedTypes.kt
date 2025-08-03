@@ -1,5 +1,7 @@
 package org.jetbrains.kotlin.compiler.plugin.template.ir
 
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind.Context
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind.Regular
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.types.IrDynamicType
 import org.jetbrains.kotlin.ir.types.IrErrorType
@@ -15,7 +17,7 @@ import org.jetbrains.kotlin.name.FqName
 
 internal fun IrSimpleFunction.signatureAsInjectionFunction(): InjectionFunctionSignature = InjectionFunctionSignature(
     name = fqNameWhenAvailable ?: TODO(),
-    parameters = valueParameters.map { it.type.toTypeExpression() }
+    parameters = parameters.filter { it.kind == Regular || it.kind == Context }.map { it.type.toTypeExpression() }
 )
 
 internal data class InjectionFunctionSignature(

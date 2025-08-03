@@ -167,3 +167,8 @@ FILE fqName:foo.bar fileName:/simple.kt
                 public open fun toString (): kotlin.String declared in foo.bar.Foo
               $this: VALUE_PARAMETER name:<this> type:kotlin.Any
           CONSTRUCTOR_CALL 'public constructor <init> () declared in foo.bar.foo.<no name provided>' type=foo.bar.foo.<no name provided> origin=OBJECT_LITERAL
+FILE fqName:_main_.__sink_metadata__ fileName:__File_Name_That_A_Plugin_Must_Provide_For_No_Apparent_Reason__
+  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:sinkMetadata visibility:public modality:FINAL <> () returnType:kotlin.Unit
+    annotations:
+      _SinkMetadata(data = "{"injectionFunctions":[{"name":"foo.bar.Foo","parameters":[]},{"name":"foo.bar.Baz","parameters":[]}],"services":[]}")
+    BLOCK_BODY
