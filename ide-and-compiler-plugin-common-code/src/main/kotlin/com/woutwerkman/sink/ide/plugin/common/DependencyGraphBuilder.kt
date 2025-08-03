@@ -57,6 +57,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         }
             .withIndirectMissingDependencies(module)
             .detectingCycles()
+            .detectingDuplicates(moduleDependencyGraphs)
     }
 
     context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
@@ -108,7 +109,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         fun dfs(node: FunctionSymbol) {
             if (node in recursionStack) {
                 val cycleStart = currentPath.indexOf(node)
-                cycles.add(currentPath.subList(cycleStart, currentPath.size))
+                cycles.add(currentPath.slice(cycleStart..< currentPath.size))
                 return
             }
             if (node in visited) return
@@ -265,11 +266,20 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
     private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.detectingDuplicates(
         moduleDependencyGraphs: List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>>,
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> {
-        val typesInThisModule = HashSet<FunctionSymbol>()
-        val duplicateTypes = instantiatorFunctionsToDependencies.keys.filterNotTo(HashSet(), typesInThisModule::add)
+        val typesInThisModule = HashSet<TypeExpression>()
+        val duplicateTypes = instantiatorFunctionsToDependencies
+            .keys
+            .asSequence()
+            .map { it.returnType }
+            .filterNotTo(HashSet(), typesInThisModule::add)
 
         for (moduleDependencyGraph in moduleDependencyGraphs) {
-            moduleDependencyGraph.injectables.keys.filterTo(duplicateTypes) { it in typesInThisModule }
+            moduleDependencyGraph
+                .injectables
+                .keys
+                .asSequence()
+                .map { it.returnType }
+                .filterTo(duplicateTypes) { it in typesInThisModule }
         }
 
         return copy(duplicates = duplicateTypes.mapLikelyEmpty { type ->

@@ -81,8 +81,8 @@ class GraphBuilderTest {
         }.also { graph ->
             assert(graph.instantiatorFunctionsToDependencies.size == 2)
             assertEquals(
-                listOf("bar", "foo"),
-                graph.duplicates.single().map { it.name },
+                setOf("bar", "foo"),
+                graph.duplicates.single().map { it.name }.toSet(),
             )
         }
     }
@@ -98,8 +98,8 @@ class GraphBuilderTest {
         }.also { graph ->
             assert(graph.instantiatorFunctionsToDependencies.size == 2)
             assertEquals(
-                listOf("bar", "foo"),
-                graph.cycles.single().map { it.name },
+                setOf("bar", "foo"),
+                graph.cycles.single().map { it.name }.toSet(),
             )
         }
     }
@@ -116,8 +116,16 @@ class GraphBuilderTest {
         }.also { graph ->
             assert(graph.instantiatorFunctionsToDependencies.size == 2)
             assertEquals(
-                listOf("bar", "foo"),
-                graph.cycles.single().map { it.name },
+                "bar",
+                graph
+                    .instantiatorFunctionsToDependencies
+                    .entries
+                    .first { it.key.name == "baz" }
+                    .value
+                    .single()
+                    .let { it as DependencyGraphBuilder.ResolvedDependency.MatchFound }
+                    .instantiatorOrInjectorFunction
+                    .name,
             )
         }
     }
