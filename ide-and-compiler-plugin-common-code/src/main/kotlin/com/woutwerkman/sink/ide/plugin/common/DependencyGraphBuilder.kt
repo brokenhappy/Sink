@@ -90,7 +90,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         is ResolvedDependency.MatchFound -> copy(parameterName = newName)
     }
 
-    context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
     private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.detectingCycles(
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> =
         instantiatorFunctionsToDependencies
@@ -99,7 +98,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             ?.let { copy(cycles = it) }
             ?: this
 
-    context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
     private fun Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>.findCycles(): List<List<FunctionSymbol>> {
         val visited = mutableSetOf<FunctionSymbol>()
         val recursionStack = mutableSetOf<FunctionSymbol>()
@@ -243,25 +241,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             dependencies.resolvingCrossModuleDependencies(injectable.module)
         }
 
-    private fun Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>.mapDependenciesRecursivelyMemoized(
-        mapper: (
-            injectable: FunctionSymbol,
-            oldDependencies: List<ResolvedDependency<TypeExpression, FunctionSymbol>>,
-            recurse: (FunctionSymbol) -> List<ResolvedDependency<TypeExpression, FunctionSymbol>>,
-        ) -> List<ResolvedDependency<TypeExpression, FunctionSymbol>>,
-    ): Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>> {
-        val newMap = HashMap<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>(this.size)
-        val visited = HashSet<FunctionSymbol>()
-        fun recurse(injectable: FunctionSymbol): List<ResolvedDependency<TypeExpression, FunctionSymbol>> =
-            newMap.computeIfAbsent(injectable) {
-                val dependencies = this[injectable]!!
-                if (!visited.add(injectable)) dependencies // Uh-oh! We encountered a cycle. In theory that might be introduced this mapping operation. We will just return the old values
-                else mapper(injectable, dependencies, ::recurse)
-            }
-
-        return mapValues { (it, _) -> recurse(it) }
-    }
-
     context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
     private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.detectingDuplicates(
         moduleDependencyGraphs: List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>>,
@@ -318,28 +297,6 @@ private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpr
 context(functionBehavior: FunctionBehavior<*, FunctionSymbol>)
 private val <FunctionSymbol> FunctionSymbol.module: Any? get() = functionBehavior.getModuleOf(this)
 
-//fun <Type, TypeSymbol, FunctionSymbol> dependencyGraphFromSources(
-//    sourceInjectables: List<FunctionSymbol>,
-//): DependencyGraph<Type, TypeSymbol, FunctionSymbol> {
-//    TODO()
-//}
-
-//class DependencyGraphImpl<Type, TypeSymbol, TypeParameterSymbol, FunctionSymbol>(
-//    private val typeFqnToInjectionFunctionsMap: Map<String, List<String>>,
-//    private val graph: Map<String, List<ResolvedDependency<Type>>>,
-//    private val parentGraph: DependencyGraph<Type, TypeSymbol, TypeParameterSymbol, FunctionSymbol>? = null,
-//): DependencyGraph<Type, TypeSymbol, TypeParameterSymbol, FunctionSymbol> {
-//    context(_: TypeBehavior<Type, TypeSymbol, TypeParameterSymbol>, _: InjectableBehavior<Type, FunctionSymbol>)
-//    override fun findCandidatesThatProvide(type: Type): List<FunctionSymbol> {
-//        TODO("Not yet implemented")
-//    }
-////        typeFqnToInjectionFunctionsMap[type.fqnWithoutGenerics]
-////            ?.map {  }
-////            ?.filter { candidate -> type.isSubtypeOf(candidate.returnType) }
-////            ?.plus(parentGraph?.findCandidatesThatProvide(type) ?: emptyList())
-////            ?: emptyList()
-//}
-
 class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
     val instantiatorFunctionsToDependencies: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>,
     val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
@@ -389,6 +346,7 @@ class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
             injectables = instantiatorFunctionsToDependencies.mapValues { (it, _) -> recursionContext.recurse(it) },
         )
     }
+
 
 }
 
@@ -449,7 +407,7 @@ class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
             ?: emptyList()
 }
 
-private fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R> = when (size) {
+private inline fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R> = when (size) {
     0 -> emptyList()
     1 -> listOf(mapper(first()))
     else -> mapTo(ArrayList(size), mapper)
