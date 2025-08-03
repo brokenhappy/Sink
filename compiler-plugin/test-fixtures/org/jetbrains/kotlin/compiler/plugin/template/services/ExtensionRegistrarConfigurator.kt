@@ -2,8 +2,10 @@ package org.jetbrains.kotlin.compiler.plugin.template.services
 
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
+import org.jetbrains.kotlin.compiler.plugin.template.FirGenerator
 import org.jetbrains.kotlin.compiler.plugin.template.ir.SimpleIrGenerationExtension
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
@@ -15,5 +17,10 @@ class ExtensionRegistrarConfigurator(testServices: TestServices) : EnvironmentCo
         configuration: CompilerConfiguration
     ) {
         IrGenerationExtension.registerExtension(SimpleIrGenerationExtension())
+        FirExtensionRegistrarAdapter.registerExtension(object : FirExtensionRegistrar() {
+            override fun ExtensionRegistrarContext.configurePlugin() {
+                +::FirGenerator
+            }
+        })
     }
 }

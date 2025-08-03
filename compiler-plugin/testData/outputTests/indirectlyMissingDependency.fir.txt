@@ -23,3 +23,9 @@ FILE: indirectlyMissingDependency.kt
         }
 
     }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_main__9545492147483647JVM__1_8_|): R|kotlin/Unit|
+    public final interface _main__9545492147483647JVM__1_8_ : R|kotlin/Any| {
+    }

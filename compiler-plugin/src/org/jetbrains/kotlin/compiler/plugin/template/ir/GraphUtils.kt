@@ -1,19 +1,22 @@
 package org.jetbrains.kotlin.compiler.plugin.template.ir
 
+import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
+import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin.*
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
 import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConst
@@ -27,7 +30,10 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
+import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
+import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
 import org.jetbrains.kotlin.ir.types.IrDynamicType
@@ -37,51 +43,28 @@ import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.MARKED_NULLABLE
 import org.jetbrains.kotlin.ir.types.typeOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
+import org.jetbrains.kotlin.ir.util.fileOrNull
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.getPackageFragment
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import java.util.*
 
-internal fun Map<IrFunction, List<ResolvedDependency>>.findCycles(): List<List<IrFunction>> {
-    val visited = mutableSetOf<IrFunction>()
-    val recursionStack = mutableSetOf<IrFunction>()
-    val cycles = mutableListOf<List<IrFunction>>()
-    val currentPath = LinkedList<IrFunction>()
-
-    fun dfs(node: IrFunction) {
-        if (node in recursionStack) {
-            val cycleStart = currentPath.indexOf(node)
-            cycles.add(currentPath.subList(cycleStart, currentPath.size))
-            return
-        }
-        if (node in visited) return
-
-        visited.add(node)
-        recursionStack.add(node)
-        currentPath.addLast(node)
-
-        this[node]?.forEach { next ->
-            when (next) {
-                is ResolvedDependency.MatchFound -> dfs(next.instantiatorFunction)
-                is ResolvedDependency.MissingDependency -> {}
-            }
-        }
-
-        recursionStack.remove(node)
-        currentPath.removeLast()
-    }
-
-    keys.forEach { node ->
-        if (node !in visited) {
-            dfs(node)
-        }
-    }
-
-    return cycles
-}
+internal typealias ModuleDependencyGraph =
+    com.woutwerkman.sink.ide.plugin.common.ModuleDependencyGraph<IrFunctionSymbol, IrType, IrClassifierSymbol>
+internal typealias DependencyGraph =
+    com.woutwerkman.sink.ide.plugin.common.DependencyGraphFromSources<IrFunctionSymbol, IrType, IrClassifierSymbol>
+internal typealias ResolvedDependency =
+    DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol>
+internal typealias MissingDependency =
+    DependencyGraphBuilder.ResolvedDependency.MissingDependency<IrType, IrFunctionSymbol>
+internal typealias MatchFound =
+    DependencyGraphBuilder.ResolvedDependency.MatchFound<IrType, IrFunctionSymbol>
+internal typealias TypeBehavior =
+    com.woutwerkman.sink.ide.plugin.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
+internal typealias FunctionBehavior =
+    com.woutwerkman.sink.ide.plugin.common.FunctionBehavior<IrType, IrFunctionSymbol>
 
 internal class InjectionFunctionCreationSession(
     private val pluginContext: IrPluginContext,
@@ -97,14 +80,12 @@ internal class InjectionFunctionCreationSession(
         val declaration: IrSimpleFunction?,
     )
 
-    internal fun generateInjectionFunction(
-        instantiator: IrFunction,
-        graph: GraphBuildResult.NoIssues,
-    ): IrSimpleFunction = generateInjectionFunctionInternal(instantiator, graph).declaration!!
+    internal fun generateInjectionFunction(instantiator: IrFunction, graph: DependencyGraph): IrSimpleFunction =
+        generateInjectionFunctionInternal(instantiator, graph).declaration!!
 
     private fun generateInjectionFunctionInternal(
         instantiator: IrFunction,
-        graph: GraphBuildResult.NoIssues,
+        graph: DependencyGraph,
     ): InjectionFunction = cache.computeIfAbsent(instantiator.returnType) { _ ->
         if (!instantiator.isDeclaredIn(moduleFragment)) return@computeIfAbsent InjectionFunction(
             functionSymbol = pluginContext.referenceFunctions(CallableId(
@@ -137,12 +118,12 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = graph.allMissingDependenciesOf(instantiator).map { dependency ->
+                parameters = graph.allMissingDependenciesOf(instantiator.symbol).map { dependency ->
                     pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefMissingDependencyParameter] */
                         startOffset = instantiator.startOffset,
                         endOffset = instantiator.endOffset,
                         origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
-                        name = dependency.parameterName,
+                        name = Name.identifier(dependency.parameterName),
                         type = dependency.type,
                         symbol = IrValueParameterSymbolImpl(),
                         isAssignable = false,
@@ -150,6 +131,7 @@ internal class InjectionFunctionCreationSession(
                         isCrossinline = false,
                         isNoinline = false,
                         isHidden = false,
+                        kind = IrParameterKind.Regular,
                     )
                 },
                 expressionCreator = { injectionCacheReceiverParameterCreator, functionDeclaration ->
@@ -166,23 +148,24 @@ internal class InjectionFunctionCreationSession(
                                 expression = factory.createCallExpression( /** Represents: [_DocRefInstantiatorCall] */
                                     type = instantiator.returnType,
                                     symbol = instantiator.symbol as IrSimpleFunctionSymbol,
-                                    arguments = graph.graph[instantiator]!!.map { dependency ->
-                                        createDependencyProvidingArgument(
-                                            dependency,
-                                            graph,
-                                            factory,
-                                            injectionCacheReceiverParameterCreator,
-                                            getParameterValueByType = { type ->
-                                                IrGetValueImpl(
-                                                    startOffset = instantiator.startOffset,
-                                                    endOffset = instantiator.endOffset,
-                                                    type = type,
-                                                    symbol = functionDeclaration.parameters.first { it.type == type }.symbol,
-                                                    origin = GeneratedBySink,
-                                                )
-                                            }
-                                        )
-                                    },
+                                    arguments = graph.instantiatorFunctionsToDependencies[instantiator.symbol]!!
+                                        .map { dependency ->
+                                            createDependencyProvidingArgument(
+                                                dependency,
+                                                graph,
+                                                factory,
+                                                injectionCacheReceiverParameterCreator,
+                                                getParameterValueByType = { type ->
+                                                    IrGetValueImpl(
+                                                        startOffset = instantiator.startOffset,
+                                                        endOffset = instantiator.endOffset,
+                                                        type = type,
+                                                        symbol = functionDeclaration.parameters.first { it.type == type }.symbol,
+                                                        origin = GeneratedBySink,
+                                                    )
+                                                }
+                                            )
+                                        },
                                 ),
                             ),
                         ),
@@ -195,34 +178,37 @@ internal class InjectionFunctionCreationSession(
 
     private fun createDependencyProvidingArgument(
         dependency: ResolvedDependency,
-        graph: GraphBuildResult.NoIssues,
+        graph: DependencyGraph,
         factory: IrFactoryWithSameOffsets,
         injectionCacheReceiverParameterCreator: () -> IrGetValue?,
         getParameterValueByType: (IrType) -> IrGetValue,
     ): IrExpression = when (dependency) {
-        is ResolvedDependency.MissingDependency ->
+        is MissingDependency ->
             getParameterValueByType(dependency.type) /** Represents: [_DocRefMissingDependencyDrill] */
-        is ResolvedDependency.MatchFound ->
+        is MatchFound ->
             factory.createCallExpression( /** Represents: [_DocRefInjectorCall] */
-                type = dependency.instantiatorFunction.returnType,
+                type = dependency.instantiatorOrInjectorFunction.owner.returnType,
                 symbol = generateInjectionFunctionInternal(
-                    dependency.instantiatorFunction,
+                    dependency.instantiatorOrInjectorFunction.owner,
                     graph,
                 ).functionSymbol,
                 extensionReceiver = injectionCacheReceiverParameterCreator(), /** Represents: [_DocRefThisValue] */
-                arguments = graph.allMissingDependenciesOf(dependency.instantiatorFunction).map { subDependency ->
-                    createDependencyProvidingArgument(
-                        subDependency,
-                        graph,
-                        factory,
-                        injectionCacheReceiverParameterCreator,
-                        getParameterValueByType,
-                    )
-                }
-                // TODO: Support generics
+                arguments = graph
+                    .allMissingDependenciesOf(dependency.instantiatorOrInjectorFunction)
+                    .map { subDependency ->
+                        createDependencyProvidingArgument(
+                            subDependency,
+                            graph,
+                            factory,
+                            injectionCacheReceiverParameterCreator,
+                            getParameterValueByType,
+                        )
+                    }
+                    // TODO: Support generics
             )
     }
 }
+
 
 /**
  * Given:
@@ -234,7 +220,7 @@ internal class InjectionFunctionCreationSession(
  * fun bar(foo: Foo, baz: Baz, buz: Buz): Bar = TODO()
  * ```
  *
- * Module B:
+ * Module B(A):
  * ```kt
  * package moduleb
  *
@@ -272,6 +258,8 @@ private typealias _DocRefMissingDependencyDrill = Nothing // --->             ba
                                                                //   )
 
 private val GeneratedBySink by IrStatementOriginImpl
+
+private fun IrDeclaration.isDeclaredIn(module: IrModuleFragment): Boolean = fileOrNull?.module == module
 
 private class IrFactoryWithSameOffsets(
     val factory: IrFactory,
@@ -316,12 +304,10 @@ private class IrFactoryWithSameOffsets(
         returnType = returnType,
         symbol = symbol,
     ).also { function ->
-        val receiverValueParameter = receiver
-            ?.let { function.createExtensionReceiver(receiver) }
-            ?.also { function.extensionReceiverParameter = it }
+        val receiverValueParameter = receiver?.let { function.createExtensionReceiver(receiver) }
 
-        parameters.forEach {
-            function.addValueParameter(it.name, it.type, it.origin)
+        (listOfNotNull(receiverValueParameter) + parameters).forEach {
+            function.parameters += it
             it.parent = function
         }
 
@@ -454,3 +440,13 @@ internal fun IrSimpleType.typeArgumentsToString(
     }
 
 internal object SinkPluginKey: GeneratedDeclarationKey()
+
+private fun DependencyGraph.allMissingDependenciesOf(function: IrFunctionSymbol): List<MissingDependency> =
+    instantiatorFunctionsToDependencies[function]?.allMissingDependencies() ?: emptyList()
+
+private fun List<ResolvedDependency>.allMissingDependencies(): List<MissingDependency> = flatMap { dependency ->
+    when (dependency) {
+        is MatchFound -> dependency.indirectDependencies.allMissingDependencies()
+        is MissingDependency -> listOf(dependency)
+    }
+}
