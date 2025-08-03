@@ -6,11 +6,21 @@ import com.woutwerkman.sink.ide.plugin.common.TypeVariance.*
 
 data class ConcreteType<TypeSymbol, TypeExpression>(val symbol: TypeSymbol, val genericArguments: List<TypeExpression>)
 
+enum class DeclarationVisibility {
+    Public,
+    Internal,
+    Protected,
+    Private,
+}
+
 interface TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol> {
     fun getFqnOf(symbol: TypeSymbol): String
+    fun getMinimumVisibilityOf(expression: TypeExpression): DeclarationVisibility
+    fun isSubtype(subtype: TypeExpression, supertype: TypeExpression): Boolean =
+        hasTypeRelation(subtype, TypeParameterResolver.empty(), supertype, TypeParameterResolver.empty(), Covariant)
     fun getVarianceOf(typeParameter: TypeParameterSymbol): TypeVariance
     fun asConcreteType(type: TypeExpression): ConcreteType<TypeSymbol, TypeExpression>?
-    fun getDirectSuperTypesOf(symbol: TypeSymbol): List<TypeExpression>
+    fun superTypesOfWithoutAny(symbol: TypeSymbol): Sequence<TypeExpression>
     fun getTypeParameterSymbolsOf(symbol: TypeSymbol): List<TypeParameterSymbol>
     fun isStarProjection(type: TypeExpression): Boolean
     fun unwrapNullableOrNull(type: TypeExpression): TypeExpression?
@@ -59,19 +69,24 @@ fun <
 
     // Handle in/out/generic
     unwrapVarianceOrNull(lhs)?.let { (lhsVariance, lhsSubexpression) ->
-        return recurse(newLhs = lhsSubexpression, newVariance = variance.nextWhenLhsIs(lhsVariance))
+        return rhs.doesNotHaveDifferentVarianceFrom(lhsVariance) // Check for variance conflict first.
+            && recurse(newLhs = lhsSubexpression, newVariance = variance.nextWhenLhsIs(lhsVariance))
     }
     asTypeParameterReference(lhs)?.let { genericParameter ->
-        return recurse(
-            newLhs = lhsTypeParameterResolver.resolve(genericParameter),
-            newVariance = variance.nextWhenLhsIs(getVarianceOf(genericParameter)),
-        )
+        val lhsVariance = getVarianceOf(genericParameter)
+        return rhs.doesNotHaveDifferentVarianceFrom(lhsVariance) // Check for variance conflict first.
+            && recurse(
+                newLhs = lhsTypeParameterResolver.resolve(genericParameter),
+                newVariance = variance.nextWhenLhsIs(lhsVariance),
+            )
     }
 
     unwrapVarianceOrNull(rhs)?.let { (rhsVariance, rhsSubexpression) ->
+        // No need to handle variance conflicts here, they've been handled above.
         return recurse(newRhs = rhsSubexpression, newVariance = variance.nextWhenLhsIs(rhsVariance).reverse())
     }
     asTypeParameterReference(rhs)?.let { genericParameter ->
+        // No need to handle variance conflicts here, they've been handled above.
         return recurse(
             newRhs = rhsTypeParameterResolver.resolve(genericParameter),
             newVariance = variance.nextWhenLhsIs(getVarianceOf(genericParameter)).reverse(),
@@ -109,6 +124,16 @@ fun <
     }
 }
 
+context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol>)
+private fun <
+    TypeExpression,
+    TypeParameterSymbol,
+    TypeSymbol,
+> TypeExpression.doesNotHaveDifferentVarianceFrom(otherVariance: TypeVariance): Boolean = (
+    typeBehavior.unwrapVarianceOrNull(this)?.variance
+        ?: typeBehavior.asTypeParameterReference(this)?.let { typeBehavior.getVarianceOf(it) }
+).isNullOr { myVariance -> myVariance == otherVariance }
+
 private fun <
     TypeExpression,
     TypeSymbol,
@@ -128,7 +153,7 @@ private fun <
     val (supertypeSymbol, supertypeArguments) = asConcreteType(supertype) ?: return false
     val nextSubtypeResolver = subtypeParameterResolver.subResolver(subtypeSymbol, subtypeArguments)
     return if (!areExactSameSymbol(subtypeSymbol, supertypeSymbol)) {
-        variance == Covariant && getDirectSuperTypesOf(subtypeSymbol).any { supertypeExpressionOfSubtype ->
+        variance == Covariant && superTypesOfWithoutAny(subtypeSymbol).any { supertypeExpressionOfSubtype ->
             hasTypeRelation(
                 supertypeExpressionOfSubtype,
                 nextSubtypeResolver,
@@ -213,6 +238,7 @@ private fun TypeVariance.nextWhenLhsIs(lhs: TypeVariance): TypeVariance = when (
 }
 
 fun <T> T?.isNotNullAnd(predicate: (T) -> Boolean): Boolean = this != null && predicate(this)
+fun <T> T?.isNullOr(predicate: (T) -> Boolean): Boolean = this == null || predicate(this)
 
 /** The combination of [zip]ping 3 guaranteed same size lists and calling [all] */
 private inline fun <T, U, V> zipAndAll(

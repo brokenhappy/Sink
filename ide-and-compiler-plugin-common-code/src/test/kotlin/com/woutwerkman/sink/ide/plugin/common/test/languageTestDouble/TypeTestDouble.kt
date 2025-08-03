@@ -1,6 +1,7 @@
 package com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble
 
 import com.woutwerkman.sink.ide.plugin.common.ConcreteType
+import com.woutwerkman.sink.ide.plugin.common.DeclarationVisibility
 import com.woutwerkman.sink.ide.plugin.common.TypeBehavior
 import com.woutwerkman.sink.ide.plugin.common.TypeVariance
 import com.woutwerkman.sink.ide.plugin.common.WithVariance
@@ -19,7 +20,7 @@ import kotlin.test.fail
 @Suppress("LocalVariableName")
 class TestTypeTestDoublesSubtypes {
     private fun TypeExpression.isSubtypeOf(other: TypeExpression): Boolean =
-        hasTypeRelation(TestDoubleTypeBehavior, lhs = this, rhs = other, variance = TypeVariance.Covariant)
+        TestDoubleTypeBehavior.hasTypeRelation(lhs = this, rhs = other, variance = TypeVariance.Covariant)
 
     context(scheduler: LanguageTestDouble.TypeExpressionAssertionScheduler)
     private inline fun <reified Lhs, reified Rhs> List<TypeExpression>.haveSameTypeRelationAs() {
@@ -559,7 +560,8 @@ class TestTypeTestDoublesSubtypes {
             class Bar
 
             val Foo = public type "Foo"("T")
-            val Bar = public type "Bar"
+            val Baz = public type "Baz"
+            val Bar = public type "Bar"("out T") extends { (T) -> Foo(T) and Baz }
 
             (Foo(`in`(Bar)) and Foo(out(Bar))).haveSameTypeRelationAs<Foo, Foo>()
         }
@@ -568,9 +570,17 @@ class TestTypeTestDoublesSubtypes {
 
 object TestDoubleTypeBehavior: TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol> {
     override fun getFqnOf(symbol: TypeSymbol): String = symbol.fqName
+    override fun getMinimumVisibilityOf(expression: TypeExpression): DeclarationVisibility {
+        TODO("Not yet implemented")
+    }
+
     override fun asConcreteType(type: TypeExpression): ConcreteType<TypeSymbol, TypeExpression>? =
         (type as? TypeExpression.Concrete)?.let { ConcreteType(it.symbol, it.arguments) }
-    override fun getDirectSuperTypesOf(symbol: TypeSymbol): List<TypeExpression> = symbol.supertypes
+
+    override fun superTypesOfWithoutAny(symbol: TypeSymbol): Sequence<TypeExpression> {
+        TODO("Not yet implemented")
+    }
+
     override fun getTypeParameterSymbolsOf(symbol: TypeSymbol): List<TypeParameterSymbol> = symbol.parameters
     override fun isStarProjection(type: TypeExpression): Boolean = type is TypeExpression.StarProjection
     override fun isTopType(type: TypeExpression): Boolean = type is TypeExpression.TopType
