@@ -31,30 +31,17 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         injectablesOfThisModule: List<FunctionSymbol>,
         moduleDependencyGraphs: List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>>,
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> = context(functionBehavior, typeBehavior) {
-        val superTypeMapOfThisModule = injectablesOfThisModule.asSupertypeMap()
         val module = injectablesOfThisModule
             .firstOrNull()
             ?.module
-            ?: TODO("Handle")
+            ?: return DependencyGraphFromSources.empty()
 
         DependencyGraphFromSources(
-            injectablesOfThisModule.associateWith { listOf() },
-            superTypeMapOfThisModule,
+            instantiatorFunctionsToDependencies = injectablesOfThisModule.associateWith { listOf() },
+            superTypesMap = injectablesOfThisModule.asSupertypeMap(),
             moduleDependencyGraphs = moduleDependencyGraphs,
-        ).mapDependenciesRecursivelyMemoized { injectionFunction, _ ->
-            injectionFunction.parameters.map { (name, type) ->
-                val matches = superTypeMapOfThisModule
-                    .findCandidatesThatProvide(type)
-                    .plusLikelyEmpty(moduleDependencyGraphs.findInjectorsForType(type))
-
-                if (matches.isEmpty()) ResolvedDependency.MissingDependency(name, type)
-                else ResolvedDependency.MatchFound(
-                    parameterName = name,
-                    matches.single(),
-                    recurse(matches.single()), // TODO: Handle ambiguous
-                )
-            }
-        }
+        )
+            .hydrateShallowDependencies()
             .withIndirectMissingDependencies(module)
             .detectingCycles()
             .detectingDuplicates(moduleDependencyGraphs)
@@ -97,6 +84,24 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             .ifEmpty { null }
             ?.let { copy(cycles = it) }
             ?: this
+
+    context(
+        functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
+        typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
+    )
+    private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.hydrateShallowDependencies(
+    ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> =
+        mapDependenciesRecursivelyMemoized { injectionFunction, _ ->
+            injectionFunction.parameters.map { (name, type) ->
+                val matches = findCandidatesForType(type)
+                if (matches.isEmpty()) ResolvedDependency.MissingDependency(name, type)
+                else ResolvedDependency.MatchFound(
+                    parameterName = name,
+                    matches.single(),
+                    recurse(matches.single()), // TODO: Handle ambiguous
+                )
+            }
+    }
 
     private fun Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>.findCycles(): List<List<FunctionSymbol>> {
         val visited = mutableSetOf<FunctionSymbol>()
@@ -208,22 +213,24 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
 
                             // TODO: First: It might be that the user (perhaps unknowingly) added
                             // TODO: the indirect missing dependency to their own dependencies already (Removed the logic, needs verification)
-                            findCandidateForType(indirectDependency.type)?.let { candidateFromThisModule ->
-                                // Yay! We were able to resolve a dependency unlike the original module that declared it
-                                // Okay, so far we know that:
-                                //  - One of our dependencies was:
-                                //    - From another module
-                                //    - And had a dependency that it was not able to satisfy in
-                                //      their own module (AKA, missing dependency)
-                                //    - And we were able to satisfy this dependency in our own module
-                                // The newly added dependency might again have its own missing dependencies.
-                                // So we recurse down its missing dependencies as well.
-                                ResolvedDependency.MatchFound(
-                                    parameterName = indirectDependency.parameterName,
-                                    instantiatorOrInjectorFunction = candidateFromThisModule,
-                                    indirectDependencies = recurse(candidateFromThisModule)
-                                        .resolvingCrossModuleDependencies(candidateFromThisModule.module),
-                                )
+                            findCandidatesForType(indirectDependency.type)
+                                .singleOrNull() // TODO: Handle ambiguous
+                                ?.let { candidateFromThisModule ->
+                                    // Yay! We were able to resolve a dependency unlike the original module that declared it
+                                    // Okay, so far we know that:
+                                    //  - One of our dependencies was:
+                                    //    - From another module
+                                    //    - And had a dependency that it was not able to satisfy in
+                                    //      their own module (AKA, missing dependency)
+                                    //    - And we were able to satisfy this dependency in our own module
+                                    // The newly added dependency might again have its own missing dependencies.
+                                    // So we recurse down its missing dependencies as well.
+                                    ResolvedDependency.MatchFound(
+                                        parameterName = indirectDependency.parameterName,
+                                        instantiatorOrInjectorFunction = candidateFromThisModule,
+                                        indirectDependencies = recurse(candidateFromThisModule)
+                                            .resolvingCrossModuleDependencies(candidateFromThisModule.module),
+                                    )
                             } ?: indirectDependency
                         } else {
                             indirectDependency
@@ -297,28 +304,34 @@ private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpr
 context(functionBehavior: FunctionBehavior<*, FunctionSymbol>)
 private val <FunctionSymbol> FunctionSymbol.module: Any? get() = functionBehavior.getModuleOf(this)
 
-class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
+data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
     val instantiatorFunctionsToDependencies: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>>,
     val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
     val cycles: List<List<FunctionSymbol>> = emptyList(),
     val duplicates: List<List<FunctionSymbol>> = emptyList(),
     val moduleDependencyGraphs: List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>>,
 ) {
-    interface DependencyRecursionContext<FunctionSymbol, TypeExpression> {
-        fun recurse(symbol: FunctionSymbol): List<ResolvedDependency<TypeExpression, FunctionSymbol>>
-        fun findCandidateForType(type: TypeExpression): FunctionSymbol?
+    companion object {
+        private val Empty = DependencyGraphFromSources<Nothing, Nothing, Nothing>(
+            emptyMap(), emptyMap(), emptyList(), emptyList(), emptyList(),
+        )
+
+        @Suppress("UNCHECKED_CAST")
+        fun <FunctionSymbol, TypeExpression, TypeSymbol> empty() =
+            Empty as DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>
     }
 
-    internal fun copy(
-        injectables: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol>>> = this.instantiatorFunctionsToDependencies,
-        superTypesMap: Map<TypeSymbol, List<FunctionSymbol>> = this.superTypesMap,
-        cycles: List<List<FunctionSymbol>> = this.cycles,
-        duplicates: List<List<FunctionSymbol>> = this.duplicates,
-        moduleDependencyGraphs: List<ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>> = this.moduleDependencyGraphs,
-    ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> =
-        DependencyGraphFromSources(injectables, superTypesMap, cycles, duplicates, moduleDependencyGraphs)
-
     context(behavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
+    fun findCandidatesForType(type: TypeExpression): List<FunctionSymbol> =
+        superTypesMap
+            .findCandidatesThatProvide(type)
+            .plusLikelyEmpty(moduleDependencyGraphs.findInjectorsForType(type))
+
+    interface DependencyRecursionContext<FunctionSymbol, TypeExpression> {
+        fun recurse(symbol: FunctionSymbol): List<ResolvedDependency<TypeExpression, FunctionSymbol>>
+    }
+
+    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
     internal inline fun mapDependenciesRecursivelyMemoized(
         crossinline mapper: DependencyRecursionContext<FunctionSymbol, TypeExpression>.(
             injectable: FunctionSymbol,
@@ -337,17 +350,13 @@ class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>(
                     if (!visited.add(symbol)) emptyList() // Uh-oh! We encountered a cycle. We don't store the result in the map, but instead return an empty list.
                     else mapper(symbol, dependencies)
                 }
-
-            override fun findCandidateForType(type: TypeExpression): FunctionSymbol? =
-                superTypesMap.findCandidatesThatProvide(type).singleOrNull() // TODO: Handle
         }
 
         return copy(
-            injectables = instantiatorFunctionsToDependencies.mapValues { (it, _) -> recursionContext.recurse(it) },
+            instantiatorFunctionsToDependencies =
+                instantiatorFunctionsToDependencies.mapValues { (it, _) -> recursionContext.recurse(it) },
         )
     }
-
-
 }
 
 private fun <T> List<T>.plusLikelyEmpty(other: List<T>): List<T> = when {
@@ -396,9 +405,7 @@ class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
     val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
 ) {
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    fun findCandidatesThatProvide(
-        type: TypeExpression,
-    ): List<FunctionSymbol> =
+    fun findCandidatesThatProvide(type: TypeExpression): List<FunctionSymbol> =
         typeBehavior
             .asConcreteType(type)
             ?.symbol
