@@ -1,4 +1,4 @@
-package com.woutwerkman.sink.ide.plugin.common
+package com.woutwerkman.sink.ide.compiler.common
 
 data class WithVariance<out T>(val variance: TypeVariance, val value: T)
 

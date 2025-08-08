@@ -3,8 +3,8 @@ package com.woutwerkman.sink.compiler.plugin.ir
 // TODO: Ensure Nullability handled
 // TODO: Add support for kx Serializer injection? Might be cool icw generic support
 
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.plugin.common.moduleDependencyGraphFromBytes
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
+import com.woutwerkman.sink.ide.compiler.common.moduleDependencyGraphFromBytes
 import org.jetbrains.kotlin.backend.common.extensions.IrGeneratedDeclarationsRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext

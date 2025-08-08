@@ -1,7 +1,7 @@
-package com.woutwerkman.sink.ide.plugin.common
+package com.woutwerkman.sink.ide.compiler.common
 
-import com.woutwerkman.sink.ide.plugin.common.TypeParameterResolver.Companion.subResolver
-import com.woutwerkman.sink.ide.plugin.common.TypeVariance.*
+import com.woutwerkman.sink.ide.compiler.common.TypeParameterResolver.Companion.subResolver
+import com.woutwerkman.sink.ide.compiler.common.TypeVariance.*
 
 
 data class ConcreteType<TypeSymbol, TypeExpression>(val symbol: TypeSymbol, val genericArguments: List<TypeExpression>)

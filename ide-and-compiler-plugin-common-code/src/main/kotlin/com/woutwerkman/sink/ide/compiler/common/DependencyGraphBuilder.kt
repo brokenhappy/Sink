@@ -1,6 +1,6 @@
-package com.woutwerkman.sink.ide.plugin.common
+package com.woutwerkman.sink.ide.compiler.common
 
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder.ResolvedDependency
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency
 import java.io.ByteArrayOutputStream
 import java.util.*
 import kotlin.collections.List

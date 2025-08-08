@@ -1,15 +1,15 @@
-package com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble
+package com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble
 
-import com.woutwerkman.sink.ide.plugin.common.ConcreteType
-import com.woutwerkman.sink.ide.plugin.common.DeclarationVisibility
-import com.woutwerkman.sink.ide.plugin.common.TypeBehavior
-import com.woutwerkman.sink.ide.plugin.common.TypeVariance
-import com.woutwerkman.sink.ide.plugin.common.WithVariance
-import com.woutwerkman.sink.ide.plugin.common.hasTypeRelation
-import com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble.LanguageTestDouble.TypeExpression
-import com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble.LanguageTestDouble.TypeParameterSymbol
-import com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble.LanguageTestDouble.TypeSymbol
-import com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble.LanguageTestDouble.withBuiltTypeAssertions
+import com.woutwerkman.sink.ide.compiler.common.ConcreteType
+import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
+import com.woutwerkman.sink.ide.compiler.common.TypeBehavior
+import com.woutwerkman.sink.ide.compiler.common.TypeVariance
+import com.woutwerkman.sink.ide.compiler.common.WithVariance
+import com.woutwerkman.sink.ide.compiler.common.hasTypeRelation
+import com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble.LanguageTestDouble.TypeExpression
+import com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble.LanguageTestDouble.TypeParameterSymbol
+import com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble.LanguageTestDouble.TypeSymbol
+import com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble.LanguageTestDouble.withBuiltTypeAssertions
 import kotlin.experimental.ExperimentalTypeInference
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf

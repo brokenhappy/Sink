@@ -1,10 +1,10 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphFromSources
-import com.woutwerkman.sink.ide.plugin.common.FunctionBehavior
-import com.woutwerkman.sink.ide.plugin.common.ModuleDependencyGraph
-import com.woutwerkman.sink.ide.plugin.common.injectorFunctionNameOf
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources
+import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
+import com.woutwerkman.sink.ide.compiler.common.ModuleDependencyGraph
+import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver
@@ -44,7 +44,7 @@ internal typealias ExternalDependency =
 internal typealias ImplementationDetail =
     DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<IrType, IrFunctionSymbol>
 internal typealias TypeBehavior =
-    com.woutwerkman.sink.ide.plugin.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
+    com.woutwerkman.sink.ide.compiler.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
 internal typealias FunctionBehavior =
     FunctionBehavior<IrType, IrFunctionSymbol>
 

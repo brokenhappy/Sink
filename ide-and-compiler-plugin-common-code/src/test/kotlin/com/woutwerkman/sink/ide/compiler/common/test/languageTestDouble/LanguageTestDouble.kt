@@ -1,6 +1,6 @@
-package com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble
+package com.woutwerkman.sink.ide.compiler.common.test.languageTestDouble
 
-import com.woutwerkman.sink.ide.plugin.common.TypeVariance
+import com.woutwerkman.sink.ide.compiler.common.TypeVariance
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 

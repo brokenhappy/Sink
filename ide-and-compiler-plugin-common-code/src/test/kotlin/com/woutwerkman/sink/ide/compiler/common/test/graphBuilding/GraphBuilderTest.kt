@@ -1,13 +1,13 @@
-package com.woutwerkman.sink.ide.plugin.common.test.graphBuilding
+package com.woutwerkman.sink.ide.compiler.common.test.graphBuilding
 
-import com.woutwerkman.sink.ide.plugin.common.ConcreteType
-import com.woutwerkman.sink.ide.plugin.common.DeclarationVisibility
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.plugin.common.DependencyGraphFromSources
-import com.woutwerkman.sink.ide.plugin.common.FunctionBehavior
-import com.woutwerkman.sink.ide.plugin.common.TypeBehavior
-import com.woutwerkman.sink.ide.plugin.common.TypeVariance
-import com.woutwerkman.sink.ide.plugin.common.WithVariance
+import com.woutwerkman.sink.ide.compiler.common.ConcreteType
+import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources
+import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
+import com.woutwerkman.sink.ide.compiler.common.TypeBehavior
+import com.woutwerkman.sink.ide.compiler.common.TypeVariance
+import com.woutwerkman.sink.ide.compiler.common.WithVariance
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeParameter

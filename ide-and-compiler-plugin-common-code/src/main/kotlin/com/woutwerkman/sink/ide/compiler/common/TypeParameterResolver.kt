@@ -1,4 +1,4 @@
-package com.woutwerkman.sink.ide.plugin.common
+package com.woutwerkman.sink.ide.compiler.common
 
 
 class TypeParameterResolver<out TypeExpression, TypeParameterSymbol> private constructor(

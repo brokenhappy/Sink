@@ -1,6 +1,9 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
-import com.woutwerkman.sink.ide.plugin.common.*
+import com.woutwerkman.sink.ide.compiler.common.ConcreteType
+import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
+import com.woutwerkman.sink.ide.compiler.common.TypeVariance
+import com.woutwerkman.sink.ide.compiler.common.WithVariance
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.ir.declarations.IrClass
