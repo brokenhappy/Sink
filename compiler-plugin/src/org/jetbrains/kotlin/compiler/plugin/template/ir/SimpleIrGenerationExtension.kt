@@ -22,36 +22,20 @@ import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.fir.FirModuleData
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.declarations.IrConstructor
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
-import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.declarations.IrParameterKind
-import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
-import org.jetbrains.kotlin.ir.expressions.IrConstantPrimitive
-import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrThrowImpl
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrClassSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
+import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
-import org.jetbrains.kotlin.ir.util.NaiveSourceBasedFileEntryImpl
-import org.jetbrains.kotlin.ir.util.SYNTHETIC_OFFSET
-import org.jetbrains.kotlin.ir.util.addChild
-import org.jetbrains.kotlin.ir.util.addFile
-import org.jetbrains.kotlin.ir.util.callableId
-import org.jetbrains.kotlin.ir.util.constructors
-import org.jetbrains.kotlin.ir.util.file
-import org.jetbrains.kotlin.ir.util.functions
-import org.jetbrains.kotlin.ir.util.hasAnnotation
-import org.jetbrains.kotlin.ir.util.parentAsClass
-import org.jetbrains.kotlin.ir.util.render
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.name.CallableId
@@ -66,13 +50,19 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
             IrTypeBehavior(IrTypeSystemContextImpl(pluginContext.irBuiltIns)),
             functionBehavior,
             pluginContext.metadataDeclarationRegistrar,
+            pluginContext,
         ) {
-            generateInternal(moduleFragment, pluginContext)
+            generateInternal(moduleFragment)
         }
     }
 
-    context(_: TypeBehavior, _: FunctionBehavior, metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar)
-    private fun generateInternal(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+    context(
+        typeBehavior: TypeBehavior,
+        _: FunctionBehavior,
+        metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar,
+        pluginContext: IrPluginContext,
+    )
+    private fun generateInternal(moduleFragment: IrModuleFragment) {
         // TODO: Use explicit-API compiler flag for some things?
         val injectableCacheInterface = pluginContext.referenceClass(ClassId.topLevel(injectionCacheFqn))
             ?: return // Early exit, this module does not include Sink compile time dependency
@@ -95,6 +85,7 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
             pluginContext,
             moduleFragment,
             injectableCacheType,
+            typeBehavior,
             injectionCacheComputeIfAbsentMethodSymbol = injectableCacheInterface.functions.first().owner.symbol,
         )
 
@@ -113,15 +104,23 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         // Now persist the generated declarations
         injectablesAndTheirInjectionFunctions.forEach { (injectable, injectionFunction) ->
             injectable.file.addChild(injectionFunction)
+            metadataDeclarationRegistrar.registerFunctionAsMetadataVisible(injectionFunction)
         }
 
         val callableId = moduleFragment.descriptor.stableOrRegularName().getModuleMetadataFunctionId()
+        val uniqueTypeNameToDisambiguateMetadataFunctionOverloads = Name.identifier(
+            (moduleFragment.descriptor as FirModuleDescriptor).moduleData.somewhatIdentifyingName()
+        )
         moduleFragment.addFile(IrFileImpl(
             fileEntry = NaiveSourceBasedFileEntryImpl(
                 name = "__sink_metadata__",
             ),
             symbol = IrFileSymbolImpl(
-                packageFragmentWithOnlyASingleFunction(moduleFragment.descriptor, callableId)
+                packageFragmentWithOnlyASingleFunctionAndType(
+                    moduleDescriptor = moduleFragment.descriptor,
+                    callableId = callableId,
+                    typeName = uniqueTypeNameToDisambiguateMetadataFunctionOverloads,
+                )
             ),
             fqName = callableId.packageName,
             module = moduleFragment,
@@ -131,15 +130,27 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
                 startOffset = SYNTHETIC_OFFSET,
                 endOffset = SYNTHETIC_OFFSET,
                 origin = IrDeclarationOrigin.GeneratedByPlugin(SinkPluginKey),
-                name = Name.identifier(
-                    (moduleFragment.descriptor as FirModuleDescriptor).moduleData.somewhatIdentifyingName()
-                ),
+                name = uniqueTypeNameToDisambiguateMetadataFunctionOverloads,
                 visibility = DescriptorVisibilities.PUBLIC,
                 uniqueInterfaceSymbolName,
                 kind = ClassKind.INTERFACE,
-                modality = Modality.OPEN,
+                modality = Modality.SEALED,
             ).also { interfaceClass ->
                 interfaceClass.parent = file
+                interfaceClass.thisReceiver = pluginContext.irFactory.createValueParameter(
+                    startOffset = SYNTHETIC_OFFSET,
+                    endOffset = SYNTHETIC_OFFSET,
+                    origin = IrDeclarationOrigin.GeneratedByPlugin(SinkPluginKey),
+                    name = Name.special("<this>"),
+                    type = uniqueInterfaceSymbolName.typeWith(),
+                    kind = IrParameterKind.Regular,
+                    isAssignable = false,
+                    symbol = IrValueParameterSymbolImpl(),
+                    varargElementType = null,
+                    isCrossinline = false,
+                    isNoinline = false,
+                    isHidden = false,
+                ).also { it.parent = interfaceClass }
                 file.addChild(interfaceClass)
             }
             pluginContext.irFactory.createSimpleFunction(
@@ -174,26 +185,46 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
                     isNoinline = false,
                     isHidden = false,
                 ).also { it.parent = function }
+                val metadataAnnotationConstructor = pluginContext.referenceConstructors(
+                    ClassId(metadataAnnotationFqn.parent(), metadataAnnotationFqn.shortName())
+                ).single()
                 metadataDeclarationRegistrar
-                    .registerFunctionAsMetadataVisible(function)
-                metadataDeclarationRegistrar
-                    .addCustomMetadataExtension(function, compilerPluginId, graph.serializeAsModuleDependencyGraph())
-                function.body = pluginContext.irFactory.createExpressionBody(
+                    .addMetadataVisibleAnnotationsToElement(
+                        pluginContext
+                            .referenceFunctions(metadataFunctionCallableId)
+                            .first {
+                                it
+                                    .owner
+                                    .parameters
+                                    .single()
+                                    .type
+                                    .classifierOrNull
+                                    ?.owner
+                                    ?.let { it as? IrClass }
+                                    ?.name == uniqueTypeNameToDisambiguateMetadataFunctionOverloads
+                            }
+                            .owner,
+                        listOf(
+                            IrConstructorCallImpl(
+                                startOffset = SYNTHETIC_OFFSET,
+                                endOffset = SYNTHETIC_OFFSET,
+                                type = metadataAnnotationConstructor.owner.returnType,
+                                symbol = metadataAnnotationConstructor,
+                                typeArgumentsCount = 0,
+                                constructorTypeArgumentsCount = 0,
+                            ).apply {
+                                arguments[0] = IrConstImpl.string(
+                                    startOffset = SYNTHETIC_OFFSET,
+                                    endOffset = SYNTHETIC_OFFSET,
+                                    type = pluginContext.irBuiltIns.stringType,
+                                    value = graph.serializeAsModuleDependencyGraph().decodeToString(),
+                                )
+                            },
+                        ),
+                    )
+                function.body = pluginContext.irFactory.createBlockBody(
                     startOffset = SYNTHETIC_OFFSET,
                     endOffset = SYNTHETIC_OFFSET,
-                    expression = IrThrowImpl(
-                        startOffset = SYNTHETIC_OFFSET,
-                        endOffset = SYNTHETIC_OFFSET,
-                        type = pluginContext.irBuiltIns.throwableType,
-                        value = IrConstructorCallImpl(
-                            startOffset = SYNTHETIC_OFFSET,
-                            endOffset = SYNTHETIC_OFFSET,
-                            pluginContext.irBuiltIns.throwableType,
-                            pluginContext.irBuiltIns.throwableClass.constructors.first { it.owner.parameters.isEmpty() },
-                            typeArgumentsCount = 0,
-                            constructorTypeArgumentsCount = 0,
-                        )
-                    ),
                 )
             }
         })
@@ -201,12 +232,14 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
 }
 
 
-private fun packageFragmentWithOnlyASingleFunction(
+private fun packageFragmentWithOnlyASingleFunctionAndType(
     moduleDescriptor: ModuleDescriptor,
     callableId: CallableId,
+    typeName: Name,
 ): PackageFragmentDescriptorImpl = object : PackageFragmentDescriptorImpl(moduleDescriptor, callableId.packageName) {
     override fun getMemberScope(): MemberScope = object : MemberScope by MemberScope.Empty {
         override fun getFunctionNames(): Set<Name> = setOf(callableId.callableName)
+        override fun getClassifierNames(): Set<Name> = setOf(typeName)
     }
 }
 
@@ -267,17 +300,29 @@ fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
         dropWhile { it != startElement } +
         takeWhile { it != startElement }
 
-private const val compilerPluginId = "com.woutwerkman.Sink"
-
-context(metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar, _: TypeBehavior, _: FunctionBehavior)
+context(_: TypeBehavior, _: FunctionBehavior)
 private fun IrPluginContext.referenceAllModuleDependencyGraphs(): List<ModuleDependencyGraph> =
     referenceFunctions(metadataFunctionCallableId).mapNotNull { metadataFunction ->
-        metadataDeclarationRegistrar
-            .getCustomMetadataExtension(metadataFunction.owner, compilerPluginId)
+        metadataFunction
+            .owner
+            .getAnnotation(metadataAnnotationFqn)
+            ?.arguments
+            ?.single()
+            ?.let { it as? IrConst }
+            ?.value
+            ?.let { it as? String }
+            ?.encodeToByteArray()
             ?.let { metadata ->
                 moduleDependencyGraphFromBytes(
-                    functionResolver = { referenceFunctions(FqName(it).asCallableId()).single() },
-                    metadata,
+                    injectorResolver = {
+                        when (it) {
+                            "modulea.Foo" -> referenceClass(
+                                ClassId.topLevel(FqName("modulea.Foo"))
+                            )
+                        }
+                        referenceFunctions(FqName(it).asCallableId()).single()
+                    },
+                    bytes = metadata,
                 )
             }
     }
@@ -298,38 +343,6 @@ private fun collectInjectableImplementationsOf(moduleFragment: IrModuleFragment)
 private fun IrFunction.declaresInjectable(): Boolean = hasAnnotation(injectableAnnotationFqn) ||
     (this is IrConstructor && this.parentAsClass.hasAnnotation(injectableAnnotationFqn))
 
-private data class SinkModuleMetadata(
-    val exposedInjectables: List<FqName>,
-)
-
-/**
- * TODO
- */
-private fun IrPluginContext.referenceMetadataFromModuleNameOrNullIfItsNotSinkModule(moduleName: Name): SinkModuleMetadata? {
-    val metadataFunction = referenceFunctions(moduleName.getModuleMetadataFunctionId()).singleOrNull() ?: run {
-        // TODO: Log?
-        return null
-    }
-
-    metadataFunction
-        .owner
-        .annotations
-        .firstOrNull()
-        .let { it ?: error("Sink metadata from module $moduleName, has incompatible metadata format") }
-        .also { metadataAnnotation ->
-            val annotationName = metadataAnnotation.symbol.owner.parentAsClass.name.identifier
-            assert(annotationName == "_SinkMetadata") {
-                "Somehow metadata annotation from $moduleName is not a _SinkMetadata class, but instead $annotationName"
-            }
-        }
-        .arguments
-        .firstOrNull()
-        .let { it ?: error("Sink metadata from module $moduleName, has it's property and annotation, but no value") }
-        .let { it as IrConstantPrimitive }
-
-    TODO()
-}
-
 private fun ModuleDescriptor.stableOrRegularName(): Name = stableName ?: name
 private fun FirModuleData.stableOrRegularName(): Name = stableModuleName?.let(Name::identifier)
     ?: name.asString().removeSurrounding("<regular dependencies of <", ">>").let(Name::identifier)
@@ -341,7 +354,8 @@ private fun Name.getModuleMetadataFunctionId(): CallableId = CallableId(
 )
 
 private val injectableAnnotationFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template.Injectable")
-private val metadataAnnotationFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template._SinkMetadata")
+internal val metadataAnnotationFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template._SinkMetadata")
+internal val metadataAnnotationClassId = ClassId(metadataAnnotationFqn.parent(), metadataAnnotationFqn.shortName())
 private val injectionCacheFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template.InjectionCache")
 
 internal fun String.asValidJavaIdentifier(): String {

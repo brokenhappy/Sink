@@ -1,52 +1,31 @@
 package org.jetbrains.kotlin.compiler.plugin.template.ir
 
 import com.woutwerkman.sink.ide.plugin.common.DependencyGraphBuilder
+import com.woutwerkman.sink.ide.plugin.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin.*
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
-import org.jetbrains.kotlin.ir.declarations.IrFactory
-import org.jetbrains.kotlin.ir.declarations.IrFunction
-import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
-import org.jetbrains.kotlin.ir.declarations.IrParameterKind
-import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
-import org.jetbrains.kotlin.ir.declarations.IrValueParameter
-import org.jetbrains.kotlin.ir.expressions.IrCall
-import org.jetbrains.kotlin.ir.expressions.IrConst
-import org.jetbrains.kotlin.ir.expressions.IrExpression
-import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
-import org.jetbrains.kotlin.ir.expressions.IrGetValue
-import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
-import org.jetbrains.kotlin.ir.expressions.IrStatementOriginImpl
+import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin.GeneratedByPlugin
+import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImplWithShape
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrTypeParameterSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
-import org.jetbrains.kotlin.ir.types.IrDynamicType
-import org.jetbrains.kotlin.ir.types.IrErrorType
-import org.jetbrains.kotlin.ir.types.IrSimpleType
-import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.MARKED_NULLABLE
-import org.jetbrains.kotlin.ir.types.typeOrNull
-import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.fileOrNull
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.getPackageFragment
-import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -70,14 +49,14 @@ internal class InjectionFunctionCreationSession(
     private val pluginContext: IrPluginContext,
     private val moduleFragment: IrModuleFragment,
     private val injectionCacheType: IrSimpleType,
+    private val typeBehavior: TypeBehavior,
     private val injectionCacheComputeIfAbsentMethodSymbol: IrSimpleFunctionSymbol,
 ) {
-    private val cache = mutableMapOf<IrType, InjectionFunction>()
+    private val cache = mutableMapOf<IrFunction, InjectionFunction>()
 
     private data class InjectionFunction(
         val functionSymbol: IrSimpleFunctionSymbol,
-        /** null if it's injectable is declared outside [moduleFragment] */
-        val declaration: IrSimpleFunction?,
+        val declaration: IrSimpleFunction,
     )
 
     internal fun generateInjectionFunction(instantiator: IrFunction, graph: DependencyGraph): IrSimpleFunction =
@@ -86,14 +65,10 @@ internal class InjectionFunctionCreationSession(
     private fun generateInjectionFunctionInternal(
         instantiator: IrFunction,
         graph: DependencyGraph,
-    ): InjectionFunction = cache.computeIfAbsent(instantiator.returnType) { _ ->
-        if (!instantiator.isDeclaredIn(moduleFragment)) return@computeIfAbsent InjectionFunction(
-            functionSymbol = pluginContext.referenceFunctions(CallableId(
-                packageName = instantiator.getPackageFragment().packageFqName,
-                className = null,
-                callableName = Name.identifier(instantiator.returnType.asFunctionName()),
-            )).single(), // TODO: Handle non single
-            declaration = null,
+    ): InjectionFunction = cache.getOrPut(instantiator) {
+        if (!instantiator.isDeclaredIn(moduleFragment)) return@getOrPut InjectionFunction(
+            declaration = instantiator as IrSimpleFunction,
+            functionSymbol = instantiator.symbol,
         )
 
         val factory = IrFactoryWithSameOffsets(
@@ -107,7 +82,7 @@ internal class InjectionFunctionCreationSession(
         InjectionFunction(
             functionSymbol = symbol,
             declaration = factory.createSimpleExpressionBodyFunction( /** Represents: [_DocRefFunctionDeclaration] */
-                name = Name.identifier(instantiator.returnType.asFunctionName()),
+                name = Name.identifier(typeBehavior.injectorFunctionNameOf(instantiator.returnType)),
                 receiver = injectionCacheType,
                 returnType = instantiator.returnType,
                 origin = GeneratedByPlugin(SinkPluginKey),
@@ -261,7 +236,7 @@ private val GeneratedBySink by IrStatementOriginImpl
 
 private fun IrDeclaration.isDeclaredIn(module: IrModuleFragment): Boolean = fileOrNull?.module == module
 
-private class IrFactoryWithSameOffsets(
+internal class IrFactoryWithSameOffsets(
     val factory: IrFactory,
     val pluginContext: IrPluginContext,
     val startOffset: Int,
@@ -311,28 +286,24 @@ private class IrFactoryWithSameOffsets(
             it.parent = function
         }
 
-        function.body = factory.createBlockBody(startOffset, endOffset).also { body ->
-            body.statements.add(IrReturnImpl(
-                startOffset,
-                endOffset,
-                returnType,
-                symbol,
-                expressionCreator(
-                    /* receiverValueParameterExpressionCreator = */ {
-                        receiver?.let {
-                            IrGetValueImpl(
-                                startOffset,
-                                endOffset,
-                                type = receiver,
-                                origin = GeneratedBySink,
-                                symbol = receiverValueParameter!!.symbol
-                            )
-                        }
-                    },
-                    /* functionDeclaration = */ function,
-                )
-            ))
-        }
+        function.body = factory.createExpressionBody(
+            startOffset,
+            endOffset,
+            expressionCreator(
+                /* receiverValueParameterExpressionCreator = */ {
+                    receiver?.let {
+                        IrGetValueImpl(
+                            startOffset,
+                            endOffset,
+                            type = receiver,
+                            origin = GeneratedBySink,
+                            symbol = receiverValueParameter!!.symbol
+                        )
+                    }
+                },
+                /* functionDeclaration = */ function,
+            ),
+        )
     }
 
     fun createCallExpression(
@@ -391,15 +362,6 @@ private class IrFactoryWithSameOffsets(
     )
 }
 
-
-private fun IrType.asFunctionName(): String = when (this) {
-    is IrDynamicType -> TODO()
-    is IrErrorType -> TODO()
-    is IrSimpleType -> (this.classifier.owner as IrDeclarationWithName).name.asStringStripSpecialMarkers() +
-        typeArgumentsToString(separator = "And", prefix = "Of", suffix = "") { it.asFunctionName() } +
-        if (nullability == MARKED_NULLABLE) "OrNull" else ""
-}
-
 private fun IrType.getClassIds(): List<ClassId> = buildList {
     fun IrType.visit() {
         when (this) {
@@ -417,7 +379,6 @@ private fun IrType.getClassIds(): List<ClassId> = buildList {
     }
     this@getClassIds.visit()
 }
-
 
 /** This key is used to identify the injectable in the injection cache */
 internal fun IrType.toCacheKey(): String = when (this) {

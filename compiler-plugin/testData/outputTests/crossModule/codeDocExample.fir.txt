@@ -28,6 +28,13 @@ FILE: fooAndBar.kt
         }
 
     }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_modulea__9545492147483647JVM__1_8_|): R|kotlin/Unit| {
+    }
+    public sealed interface _modulea__9545492147483647JVM__1_8_ : R|kotlin/Any| {
+    }
 Module: moduleb
 FILE: bazFoobsAndBarbs.kt
     package moduleb
@@ -64,4 +71,11 @@ FILE: bazFoobsAndBarbs.kt
 
         }
 
+    }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_moduleb__9545492147483647JVM__1_8_|): R|kotlin/Unit| {
+    }
+    public sealed interface _moduleb__9545492147483647JVM__1_8_ : R|kotlin/Any| {
     }
