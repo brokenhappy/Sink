@@ -8,7 +8,6 @@ import com.woutwerkman.sink.ide.plugin.common.FunctionBehavior
 import com.woutwerkman.sink.ide.plugin.common.TypeBehavior
 import com.woutwerkman.sink.ide.plugin.common.TypeVariance
 import com.woutwerkman.sink.ide.plugin.common.WithVariance
-import com.woutwerkman.sink.ide.plugin.common.test.languageTestDouble.assertEquals
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeParameter
@@ -64,7 +63,7 @@ class GraphBuilderTest {
                     .first { it.key.name == "bar" }
                     .value
                     .single()
-                    .let { it as DependencyGraphBuilder.ResolvedDependency.MatchFound }
+                    .let { it as DependencyGraphBuilder.ResolvedDependency.ImplementationDetail }
                     .instantiatorOrInjectorFunction
                     .name
             )
@@ -123,7 +122,7 @@ class GraphBuilderTest {
                     .first { it.key.name == "baz" }
                     .value
                     .single()
-                    .let { it as DependencyGraphBuilder.ResolvedDependency.MatchFound }
+                    .let { it as DependencyGraphBuilder.ResolvedDependency.ImplementationDetail }
                     .instantiatorOrInjectorFunction
                     .name,
             )

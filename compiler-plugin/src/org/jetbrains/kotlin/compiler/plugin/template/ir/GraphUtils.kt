@@ -38,8 +38,8 @@ internal typealias ResolvedDependency =
     DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol>
 internal typealias ExternalDependency =
     DependencyGraphBuilder.ResolvedDependency.ExternalDependency<IrType, IrFunctionSymbol>
-internal typealias MatchFound =
-    DependencyGraphBuilder.ResolvedDependency.MatchFound<IrType, IrFunctionSymbol>
+internal typealias ImplementationDetail =
+    DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<IrType, IrFunctionSymbol>
 internal typealias TypeBehavior =
     com.woutwerkman.sink.ide.plugin.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
 internal typealias FunctionBehavior =
@@ -160,7 +160,7 @@ internal class InjectionFunctionCreationSession(
     ): IrExpression = when (dependency) {
         is ExternalDependency ->
             getParameterValueByType(dependency.type) /** Represents: [_DocRefExternalDependencyDrill] */
-        is MatchFound ->
+        is ImplementationDetail ->
             factory.createCallExpression( /** Represents: [_DocRefInjectorCall] */
                 type = dependency.instantiatorOrInjectorFunction.owner.returnType,
                 symbol = generateInjectionFunctionInternal(
@@ -407,7 +407,7 @@ private fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol
 
 private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMap { dependency ->
     when (dependency) {
-        is MatchFound -> dependency.indirectDependencies.allExternalDependencies()
+        is ImplementationDetail -> dependency.indirectDependencies.allExternalDependencies()
         is ExternalDependency -> listOf(dependency)
     }
 }

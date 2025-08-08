@@ -16,7 +16,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
     val typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
 ) {
     sealed class ResolvedDependency<TypeExpression, FunctionSymbol> {
-        data class MatchFound<TypeExpression, FunctionSymbol>(
+        data class ImplementationDetail<TypeExpression, FunctionSymbol>(
             val parameterName: String,
             /**
              * In case of a function in our module's sources, this function is an [InstantiatorFunctionsDocRef].
@@ -60,13 +60,13 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         }
 
     private val ResolvedDependency<*, *>.parameterName get(): String = when (this) {
-        is ResolvedDependency.MatchFound -> parameterName
+        is ResolvedDependency.ImplementationDetail -> parameterName
         is ResolvedDependency.ExternalDependency -> parameterName
     }
 
     private fun ResolvedDependency<TypeExpression, FunctionSymbol>.withParameterName(newName: String): ResolvedDependency<TypeExpression, FunctionSymbol> = when (this) {
         is ResolvedDependency.ExternalDependency -> copy(parameterName = newName)
-        is ResolvedDependency.MatchFound -> copy(parameterName = newName)
+        is ResolvedDependency.ImplementationDetail -> copy(parameterName = newName)
     }
 
     private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.detectingCycles(
@@ -87,7 +87,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             injectionFunction.parameters.map { (name, type) ->
                 val matches = findCandidatesForType(type)
                 if (matches.isEmpty()) ResolvedDependency.ExternalDependency(name, type)
-                else ResolvedDependency.MatchFound(
+                else ResolvedDependency.ImplementationDetail(
                     parameterName = name,
                     matches.single(),
                     recurse(matches.single()), // TODO: Handle ambiguous
@@ -115,7 +115,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
 
             this[node]?.forEach { next ->
                 when (next) {
-                    is ResolvedDependency.MatchFound -> next.instantiatorOrInjectorFunction.also(::dfs)
+                    is ResolvedDependency.ImplementationDetail -> next.instantiatorOrInjectorFunction.also(::dfs)
                     is ResolvedDependency.ExternalDependency -> {}
                 }
             }
@@ -165,8 +165,8 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
      * //   ExternalDependency(Foobs),
      * // ]
      * // bla -> [
-     * //   MatchFound(Baz, [ExternalDependency(Foobs)])
-     * //   MatchFound(Bar, [MatchFound(Baz, [ExternalDependency(Foobs)]), ExternalDependency(Foobs)])
+     * //   ImplementationDetail(Baz, [ExternalDependency(Foobs)])
+     * //   ImplementationDetail(Bar, [ImplementationDetail(Baz, [ExternalDependency(Foobs)]), ExternalDependency(Foobs)])
      * // ]
      * fun DependencyCache.Bla(foobs: Foobs): Bla = bla(
      *   Foo(
@@ -194,7 +194,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                 moduleThatResolvedThisDependency: Any?,
             ): List<ResolvedDependency<TypeExpression, FunctionSymbol>> = mapNotNull { indirectDependency ->
                 when (indirectDependency) {
-                    is ResolvedDependency.MatchFound -> indirectDependency.copy(
+                    is ResolvedDependency.ImplementationDetail -> indirectDependency.copy(
                         indirectDependencies = recurse(indirectDependency.instantiatorOrInjectorFunction)
                             .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module),
                     )
@@ -217,7 +217,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                                     //    - And we were able to satisfy this dependency in our own module
                                     // The newly added dependency might again have its own external dependencies.
                                     // So we recurse down its external dependencies as well.
-                                    ResolvedDependency.MatchFound(
+                                    ResolvedDependency.ImplementationDetail(
                                         parameterName = indirectDependency.parameterName,
                                         instantiatorOrInjectorFunction = candidateFromThisModule,
                                         indirectDependencies = recurse(candidateFromThisModule)
@@ -406,7 +406,7 @@ private fun <TypeExpression, FunctionSymbol> List<ResolvedDependency<TypeExpress
 ) {
     forEach { dependency ->
         when (dependency) {
-            is ResolvedDependency.MatchFound -> dependency.indirectDependencies.forEachExternalDependencyRecursive(function)
+            is ResolvedDependency.ImplementationDetail -> dependency.indirectDependencies.forEachExternalDependencyRecursive(function)
             is ResolvedDependency.ExternalDependency -> function(dependency)
         }
     }
