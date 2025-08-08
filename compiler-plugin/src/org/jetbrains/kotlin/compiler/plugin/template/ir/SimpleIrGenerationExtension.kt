@@ -315,11 +315,6 @@ private fun IrPluginContext.referenceAllModuleDependencyGraphs(): List<ModuleDep
             ?.let { metadata ->
                 moduleDependencyGraphFromBytes(
                     injectorResolver = {
-                        when (it) {
-                            "modulea.Foo" -> referenceClass(
-                                ClassId.topLevel(FqName("modulea.Foo"))
-                            )
-                        }
                         referenceFunctions(FqName(it).asCallableId()).single()
                     },
                     bytes = metadata,
