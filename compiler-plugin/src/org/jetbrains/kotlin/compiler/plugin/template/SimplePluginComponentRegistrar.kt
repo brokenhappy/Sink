@@ -7,8 +7,10 @@ import org.jetbrains.kotlin.compiler.plugin.template.ir.SimpleIrGenerationExtens
 import org.jetbrains.kotlin.compiler.plugin.template.ir.asValidJavaIdentifier
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.FirModuleData
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.expressions.builder.buildBlock
 import org.jetbrains.kotlin.fir.extensions.*
 import org.jetbrains.kotlin.fir.moduleData
 import org.jetbrains.kotlin.fir.plugin.createTopLevelClass
@@ -53,23 +55,23 @@ class FirGenerator(session: FirSession) : FirDeclarationGenerationExtension(sess
         callableId: CallableId,
         context: MemberGenerationContext?
     ): List<FirNamedFunctionSymbol> = listOf(
-        createTopLevelFunction(
-            SinkGeneratedDeclaration,
-            callableId,
-            session.builtinTypes.unitType.coneType,
-        ) {
+        createTopLevelFunction(SinkGeneratedDeclaration, callableId, session.builtinTypes.unitType.coneType) {
             this.valueParameter(
                 Name.identifier("a"),
                 generateTopLevelClassLikeDeclaration(metadataOverloadType()).constructType(),
             )
-        }.symbol
+        }
+            .apply { replaceBody(buildBlock { }) }
+            .symbol
     )
 
     override fun generateTopLevelClassLikeDeclaration(classId: ClassId): FirClassLikeSymbol<*> = createTopLevelClass(
         classId = classId,
         key = SinkGeneratedMetadataOverloadClass,
         classKind = ClassKind.INTERFACE,
-        config = {},
+        config = {
+            modality = Modality.SEALED
+        },
     ).symbol
 }
 

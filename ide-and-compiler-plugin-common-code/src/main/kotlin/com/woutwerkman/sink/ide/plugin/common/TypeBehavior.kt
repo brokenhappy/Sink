@@ -37,6 +37,32 @@ fun <
     TypeExpression,
     TypeSymbol,
     TypeParameterSymbol,
+> TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol>.injectorFunctionNameOf(expression: TypeExpression): String =
+    expression.whenn(
+        isInOrOutType = { (variance, it) ->
+            val varianceString = when (variance) {
+                Covariant -> "Out"
+                Invariant -> ""
+                Contravariant -> "In"
+            }
+            "$varianceString${injectorFunctionNameOf(it)}"
+        },
+        isConcrete = { (symbol, parameters) ->
+            getFqnOf(symbol).substringAfterLast(".").asValidJavaIdentifier() +
+                if (parameters.isEmpty()) ""
+                else parameters.joinToString(separator = "And", prefix = "Of", postfix = "") {
+                    injectorFunctionNameOf(it)
+                }
+        },
+        isStarProjection = { "Star" },
+        isGeneric = { TODO("Support generics") },
+        isNullable = { "${injectorFunctionNameOf(it)}OrNull" },
+    )
+
+fun <
+    TypeExpression,
+    TypeSymbol,
+    TypeParameterSymbol,
 > TypeBehavior<
     TypeExpression,
     TypeSymbol,
@@ -254,8 +280,15 @@ inline fun <TypeExpression, TypeSymbol, TypeParameterSymbol, R> TypeExpression.w
     isConcrete: (ConcreteType<TypeSymbol, TypeExpression>) -> R,
     isStarProjection: () -> R,
     isGeneric: (genericIdentifier: TypeParameterSymbol) -> R,
-): R = typeBehavior.unwrapVarianceOrNull(this)?.let(isInOrOutType)
-    ?: typeBehavior.asConcreteType(this)?.let(isConcrete)
+    isNullable: (unwrapped: TypeExpression) -> R,
+): R = typeBehavior.asConcreteType(this)?.let(isConcrete)
+    ?: typeBehavior.unwrapVarianceOrNull(this)?.let(isInOrOutType)
     ?: (if (typeBehavior.isStarProjection(this)) isStarProjection() else null)
     ?: typeBehavior.asTypeParameterReference(this)?.let(isGeneric)
+    ?: typeBehavior.unwrapNullableOrNull(this)?.let(isNullable)
     ?: error("Unexpected type expression: $this")
+
+private fun String.asValidJavaIdentifier(): String {
+    val first = if (this.first().isJavaIdentifierStart()) this.first() else '_'
+    return first + this.drop(1).map { if (it.isJavaIdentifierPart()) it else '_' }.joinToString("")
+}

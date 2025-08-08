@@ -329,7 +329,8 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
         val recursionContext = object : DependencyRecursionContext<FunctionSymbol, TypeExpression> {
             override fun recurse(symbol: FunctionSymbol): List<ResolvedDependency<TypeExpression, FunctionSymbol>> =
                 newMap.getOrPut(symbol) {
-                    val dependencies = instantiatorFunctionsToDependencies[symbol]!!
+                    val dependencies = instantiatorFunctionsToDependencies[symbol] ?: moduleDependencyGraphs
+                        .firstNotNullOf { it.injectables[symbol] }
                     if (!visited.add(symbol)) emptyList() // Uh-oh! We encountered a cycle. We don't store the result in the map, but instead return an empty list.
                     else mapper(symbol, dependencies)
                 }
@@ -341,12 +342,15 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
         )
     }
 
-    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
+    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
     fun serializeAsModuleDependencyGraph(): ByteArray {
         val buffer = ByteArrayOutputStream(instantiatorFunctionsToDependencies.size * 32)
         buffer.writeInt(instantiatorFunctionsToDependencies.size)
         for (injectable in instantiatorFunctionsToDependencies.keys) {
-            val fqnBytes = injectable.injectionFunctionFqn.toByteArray()
+            val fqnBytes =  (
+                injectable.fqn.substringBeforeLast(".").let { if (it.isEmpty()) "" else "$it." } +
+                    typeBehavior.injectorFunctionNameOf(injectable.returnType)
+            ).encodeToByteArray()
             buffer.writeInt(fqnBytes.size)
             buffer.write(fqnBytes)
         }
@@ -356,7 +360,7 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
 
 context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, _: TypeBehavior<TypeExpression, TypeSymbol, *>)
 fun <FunctionSymbol, TypeExpression, TypeSymbol> moduleDependencyGraphFromBytes(
-    functionResolver: (fqnOfInjector: String) -> FunctionSymbol,
+    injectorResolver: (fqnOfInjector: String) -> FunctionSymbol,
     bytes: ByteArray,
 ): ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol> {
     val size = bytes.readIntAt(0)
@@ -366,7 +370,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol> moduleDependencyGraphFromBytes(
         repeat(size) {
             val fqnSize = bytes.readIntAt(currentOffset).also { currentOffset += 4 }
             val fqn = bytes.decodeToString(currentOffset, currentOffset + fqnSize).also { currentOffset += fqnSize }
-            val injector = functionResolver(fqn)
+            val injector = injectorResolver(fqn)
             this[injector] = injector.parameters.map { (name, type) ->
                 ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>(name, type)
             }
@@ -426,7 +430,7 @@ private typealias InjectorFunctionDocRef = Any
 
 interface FunctionBehavior<TypeExpression, FunctionSymbol> {
     fun getReturnTypeOf(injectable: FunctionSymbol): TypeExpression
-    fun getFqnOfInjectionFunctionOf(injectable: FunctionSymbol): String
+    fun getFqnOf(injectable: FunctionSymbol): String
     fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, TypeExpression>>
     /** Only used as equatable to other results of [getModuleOf] */
     fun getModuleOf(injectable: FunctionSymbol): Any?
@@ -436,7 +440,7 @@ context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
 private val <TypeExpression, FunctionSymbol> FunctionSymbol.parameters: List<Pair<String, TypeExpression>> get() = functionBehavior.getParametersOf(this)
 
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
-private val <TypeExpression, FunctionSymbol> FunctionSymbol.injectionFunctionFqn: String get() = functionBehavior.getFqnOfInjectionFunctionOf(this)
+private val <TypeExpression, FunctionSymbol> FunctionSymbol.fqn: String get() = functionBehavior.getFqnOf(this)
 
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
 private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpression get() = functionBehavior.getReturnTypeOf(this)

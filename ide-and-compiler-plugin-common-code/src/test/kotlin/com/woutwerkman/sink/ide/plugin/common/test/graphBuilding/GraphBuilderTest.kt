@@ -189,7 +189,7 @@ fun buildDiGraph(
 
 object TestDoubleFunctionAsInjectableBehavior : FunctionBehavior<KType, FunctionSymbol> {
     override fun getReturnTypeOf(injectable: FunctionSymbol): KType = injectable.returnType
-    override fun getFqnOfInjectionFunctionOf(injectable: FunctionSymbol): String = injectable.name
+    override fun getFqnOf(injectable: FunctionSymbol): String = injectable.name
     override fun getModuleOf(injectable: FunctionSymbol): Any? = injectable.moduleOrNullIfUnbound
 
     override fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, KType>> = injectable

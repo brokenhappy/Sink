@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.compiler.plugin.template.ir
 import com.woutwerkman.sink.ide.plugin.common.*
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
+import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithVisibility
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
@@ -20,7 +21,7 @@ import org.jetbrains.kotlin.ir.util.superTypes
 internal val functionBehavior = object : FunctionBehavior {
     override fun getReturnTypeOf(injectable: IrFunctionSymbol): IrType = injectable.owner.returnType
     override fun getModuleOf(injectable: IrFunctionSymbol): Any? = injectable.owner.fileOrNull?.module
-    override fun getFqnOfInjectionFunctionOf(injectable: IrFunctionSymbol): String =
+    override fun getFqnOf(injectable: IrFunctionSymbol): String =
         injectable.owner.fqNameWhenAvailable!!.asString()
 
     override fun getParametersOf(injectable: IrFunctionSymbol): List<Pair<String, IrType>> =
@@ -29,7 +30,7 @@ internal val functionBehavior = object : FunctionBehavior {
 
 internal class IrTypeBehavior(val typeSystemContext: IrTypeSystemContext) : TypeBehavior {
     override fun getFqnOf(symbol: IrClassifierSymbol): String =
-        (symbol.owner as? IrTypeParameterSymbol)?.owner?.fqNameWhenAvailable?.asString() ?: "UNKNOWN"
+        (symbol.owner as? IrClass)?.fqNameWhenAvailable?.asString() ?: "UNKNOWN"
 
     override fun getMinimumVisibilityOf(expression: IrType): DeclarationVisibility =
         when (getMinimumDescriptorVisibilityOf(expression)) {
