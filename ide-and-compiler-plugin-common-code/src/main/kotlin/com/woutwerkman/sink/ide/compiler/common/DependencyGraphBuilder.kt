@@ -455,7 +455,7 @@ private fun <T> List<T>.plusLikelyEmpty(other: List<T>): List<T> = when {
 }
 
 /** Semantically just [flatMap] But reduces allocations on the happy path, which is likely just a single item */
-private inline fun <T, R> List<T>.flatMapLikelySingle(mapper: (T) -> List<R>): List<R> {
+public inline fun <T, R> List<T>.flatMapLikelySingle(mapper: (T) -> List<R>): List<R> {
     var resultSingle: List<R>? = null
     var resultMultiple: MutableList<R>? = null
     for (element in this) {

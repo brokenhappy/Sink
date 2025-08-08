@@ -4,6 +4,7 @@ import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources
 import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
 import com.woutwerkman.sink.ide.compiler.common.ModuleDependencyGraph
+import com.woutwerkman.sink.ide.compiler.common.flatMapLikelySingle
 import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -408,7 +409,7 @@ internal object SinkPluginKey: GeneratedDeclarationKey()
 private fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
     instantiatorFunctionsToDependencies[function]?.allExternalDependencies() ?: emptyList()
 
-private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMap { dependency ->
+private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMapLikelySingle { dependency ->
     when (dependency) {
         is ImplementationDetail -> dependency.indirectDependencies.allExternalDependencies()
         is ExternalDependency -> listOf(dependency)
