@@ -19,7 +19,6 @@ import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
-import org.jetbrains.kotlin.fir.FirModuleData
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
@@ -314,9 +313,7 @@ private fun IrPluginContext.referenceAllModuleDependencyGraphs(): List<ModuleDep
             ?.encodeToByteArray()
             ?.let { metadata ->
                 moduleDependencyGraphFromBytes(
-                    injectorResolver = {
-                        referenceFunctions(FqName(it).asCallableId()).single()
-                    },
+                    injectorResolver = { referenceFunctions(FqName(it).asCallableId()).single() },
                     bytes = metadata,
                 )
             }
