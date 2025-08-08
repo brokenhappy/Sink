@@ -339,8 +339,6 @@ private fun IrFunction.declaresInjectable(): Boolean = hasAnnotation(injectableA
     (this is IrConstructor && this.parentAsClass.hasAnnotation(injectableAnnotationFqn))
 
 private fun ModuleDescriptor.stableOrRegularName(): Name = stableName ?: name
-private fun FirModuleData.stableOrRegularName(): Name = stableModuleName?.let(Name::identifier)
-    ?: name.asString().removeSurrounding("<regular dependencies of <", ">>").let(Name::identifier)
 
 private fun Name.getModuleMetadataFunctionId(): CallableId = CallableId(
     packageName = FqName("${asString().asValidJavaIdentifier()}.__sink_metadata__"),
@@ -350,7 +348,6 @@ private fun Name.getModuleMetadataFunctionId(): CallableId = CallableId(
 
 private val injectableAnnotationFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template.Injectable")
 internal val metadataAnnotationFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template._SinkMetadata")
-internal val metadataAnnotationClassId = ClassId(metadataAnnotationFqn.parent(), metadataAnnotationFqn.shortName())
 private val injectionCacheFqn = FqName("org.jetbrains.kotlin.compiler.plugin.template.InjectionCache")
 
 internal fun String.asValidJavaIdentifier(): String {
