@@ -1,4 +1,4 @@
-FILE fqName:<root> fileName:/indirectlyMissingDependency.kt
+FILE fqName:<root> fileName:/indirectExternalDependency.kt
   CLASS INTERFACE name:Bar modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
     $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:<root>.Bar
     FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]

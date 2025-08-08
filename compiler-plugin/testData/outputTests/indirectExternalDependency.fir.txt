@@ -1,4 +1,4 @@
-FILE: indirectlyMissingDependency.kt
+FILE: indirectExternalDependency.kt
     public abstract interface Foo : R|kotlin/Any| {
     }
     public abstract interface Bar : R|kotlin/Any| {

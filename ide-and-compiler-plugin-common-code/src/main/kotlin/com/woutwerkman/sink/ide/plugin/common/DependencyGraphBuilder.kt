@@ -25,7 +25,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             val instantiatorOrInjectorFunction: FunctionSymbol,
             val indirectDependencies: List<ResolvedDependency<TypeExpression, FunctionSymbol>>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol>()
-        data class MissingDependency<TypeExpression, FunctionSymbol>(
+        data class ExternalDependency<TypeExpression, FunctionSymbol>(
             val parameterName: String,
             val type: TypeExpression,
         ): ResolvedDependency<TypeExpression, FunctionSymbol>()
@@ -46,7 +46,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             moduleDependencyGraphs = moduleDependencyGraphs,
         )
             .hydrateShallowDependencies()
-            .withIndirectMissingDependencies(module)
+            .withIndirectExternalDependencies(module)
             .detectingCycles()
             .detectingDuplicates(moduleDependencyGraphs)
     }
@@ -61,11 +61,11 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
 
     private val ResolvedDependency<*, *>.parameterName get(): String = when (this) {
         is ResolvedDependency.MatchFound -> parameterName
-        is ResolvedDependency.MissingDependency -> parameterName
+        is ResolvedDependency.ExternalDependency -> parameterName
     }
 
     private fun ResolvedDependency<TypeExpression, FunctionSymbol>.withParameterName(newName: String): ResolvedDependency<TypeExpression, FunctionSymbol> = when (this) {
-        is ResolvedDependency.MissingDependency -> copy(parameterName = newName)
+        is ResolvedDependency.ExternalDependency -> copy(parameterName = newName)
         is ResolvedDependency.MatchFound -> copy(parameterName = newName)
     }
 
@@ -86,7 +86,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         mapDependenciesRecursivelyMemoized { injectionFunction, _ ->
             injectionFunction.parameters.map { (name, type) ->
                 val matches = findCandidatesForType(type)
-                if (matches.isEmpty()) ResolvedDependency.MissingDependency(name, type)
+                if (matches.isEmpty()) ResolvedDependency.ExternalDependency(name, type)
                 else ResolvedDependency.MatchFound(
                     parameterName = name,
                     matches.single(),
@@ -116,7 +116,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             this[node]?.forEach { next ->
                 when (next) {
                     is ResolvedDependency.MatchFound -> next.instantiatorOrInjectorFunction.also(::dfs)
-                    is ResolvedDependency.MissingDependency -> {}
+                    is ResolvedDependency.ExternalDependency -> {}
                 }
             }
 
@@ -140,8 +140,8 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
      * fun foo(Baz, Bar): Foo
      *
      * // foo -> [
-     * //   MissingDependency(Baz),
-     * //   MissingDependency(Bar),
+     * //   ExternalDependency(Baz),
+     * //   ExternalDependency(Bar),
      * // ]
      * fun DependencyCache.Foo(Baz, Bar): Foo
      *
@@ -150,8 +150,8 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
      * fun bar(Baz, Foobs): Bar
      *
      * // bar -> [
-     * //   MissingDependency(Baz),
-     * //   MissingDependency(Foobs),
+     * //   ExternalDependency(Baz),
+     * //   ExternalDependency(Foobs),
      * // ]
      * fun DependencyCache.Bar(Baz, Foobs): Bar
      *
@@ -162,11 +162,11 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
      * fun bla(Foo): Bla
      *
      * // baz -> [
-     * //   MissingDependency(Foobs),
+     * //   ExternalDependency(Foobs),
      * // ]
      * // bla -> [
-     * //   MatchFound(Baz, [MissingDependency(Foobs)])
-     * //   MatchFound(Bar, [MatchFound(Baz, [MissingDependency(Foobs)]), MissingDependency(Foobs)])
+     * //   MatchFound(Baz, [ExternalDependency(Foobs)])
+     * //   MatchFound(Bar, [MatchFound(Baz, [ExternalDependency(Foobs)]), ExternalDependency(Foobs)])
      * // ]
      * fun DependencyCache.Bla(foobs: Foobs): Bla = bla(
      *   Foo(
@@ -184,7 +184,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
         typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
     )
-    private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.withIndirectMissingDependencies(
+    private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.withIndirectExternalDependencies(
         module: Any?
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> =
         mapDependenciesRecursivelyMemoized { injectable, dependencies ->
@@ -198,13 +198,13 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                         indirectDependencies = recurse(indirectDependency.instantiatorOrInjectorFunction)
                             .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module),
                     )
-                    is ResolvedDependency.MissingDependency -> {
+                    is ResolvedDependency.ExternalDependency -> {
                         if (moduleThatResolvedThisDependency != module) {
                             // The original declaration that depended on this could not resolve this dependency.
                             // However, we are a different module. We can try again!
 
                             // TODO: First: It might be that the user (perhaps unknowingly) added
-                            // TODO: the indirect missing dependency to their own dependencies already (Removed the logic, needs verification)
+                            // TODO: the indirect external dependency to their own dependencies already (Removed the logic, needs verification)
                             findCandidatesForType(indirectDependency.type)
                                 .singleOrNull() // TODO: Handle ambiguous
                                 ?.let { candidateFromThisModule ->
@@ -213,10 +213,10 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                                     //  - One of our dependencies was:
                                     //    - From another module
                                     //    - And had a dependency that it was not able to satisfy in
-                                    //      their own module (AKA, missing dependency)
+                                    //      their own module (AKA, external dependency)
                                     //    - And we were able to satisfy this dependency in our own module
-                                    // The newly added dependency might again have its own missing dependencies.
-                                    // So we recurse down its missing dependencies as well.
+                                    // The newly added dependency might again have its own external dependencies.
+                                    // So we recurse down its external dependencies as well.
                                     ResolvedDependency.MatchFound(
                                         parameterName = indirectDependency.parameterName,
                                         instantiatorOrInjectorFunction = candidateFromThisModule,
@@ -372,7 +372,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol> moduleDependencyGraphFromBytes(
             val fqn = bytes.decodeToString(currentOffset, currentOffset + fqnSize).also { currentOffset += fqnSize }
             val injector = injectorResolver(fqn)
             this[injector] = injector.parameters.map { (name, type) ->
-                ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>(name, type)
+                ResolvedDependency.ExternalDependency<TypeExpression, FunctionSymbol>(name, type)
             }
             supertypeMap.addSupertypesOf(injector)
         }
@@ -381,7 +381,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol> moduleDependencyGraphFromBytes(
 }
 
 class ModuleDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol>(
-    val injectables: Map<FunctionSymbol, List<ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>>>,
+    val injectables: Map<FunctionSymbol, List<ResolvedDependency.ExternalDependency<TypeExpression, FunctionSymbol>>>,
     val superTypesMap: Map<TypeSymbol, List<FunctionSymbol>>,
 ) {
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
@@ -401,13 +401,13 @@ private fun ByteArrayOutputStream.writeInt(size: Int) {
     write((size shr 24) and 0xFF)
 }
 
-private fun <TypeExpression, FunctionSymbol> List<ResolvedDependency<TypeExpression, FunctionSymbol>>.forEachMissingDependencyRecursive(
-    function: (ResolvedDependency.MissingDependency<TypeExpression, FunctionSymbol>) -> Unit,
+private fun <TypeExpression, FunctionSymbol> List<ResolvedDependency<TypeExpression, FunctionSymbol>>.forEachExternalDependencyRecursive(
+    function: (ResolvedDependency.ExternalDependency<TypeExpression, FunctionSymbol>) -> Unit,
 ) {
     forEach { dependency ->
         when (dependency) {
-            is ResolvedDependency.MatchFound -> dependency.indirectDependencies.forEachMissingDependencyRecursive(function)
-            is ResolvedDependency.MissingDependency -> function(dependency)
+            is ResolvedDependency.MatchFound -> dependency.indirectDependencies.forEachExternalDependencyRecursive(function)
+            is ResolvedDependency.ExternalDependency -> function(dependency)
         }
     }
 }

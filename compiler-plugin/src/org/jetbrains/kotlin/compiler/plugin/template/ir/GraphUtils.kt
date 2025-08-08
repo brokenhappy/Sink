@@ -36,8 +36,8 @@ internal typealias DependencyGraph =
     com.woutwerkman.sink.ide.plugin.common.DependencyGraphFromSources<IrFunctionSymbol, IrType, IrClassifierSymbol>
 internal typealias ResolvedDependency =
     DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol>
-internal typealias MissingDependency =
-    DependencyGraphBuilder.ResolvedDependency.MissingDependency<IrType, IrFunctionSymbol>
+internal typealias ExternalDependency =
+    DependencyGraphBuilder.ResolvedDependency.ExternalDependency<IrType, IrFunctionSymbol>
 internal typealias MatchFound =
     DependencyGraphBuilder.ResolvedDependency.MatchFound<IrType, IrFunctionSymbol>
 internal typealias TypeBehavior =
@@ -93,8 +93,8 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = graph.allMissingDependenciesOf(instantiator.symbol).map { dependency ->
-                    pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefMissingDependencyParameter] */
+                parameters = graph.allExternalDependenciesOf(instantiator.symbol).map { dependency ->
+                    pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefExternalDependencyParameter] */
                         startOffset = instantiator.startOffset,
                         endOffset = instantiator.endOffset,
                         origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
@@ -158,8 +158,8 @@ internal class InjectionFunctionCreationSession(
         injectionCacheReceiverParameterCreator: () -> IrGetValue?,
         getParameterValueByType: (IrType) -> IrGetValue,
     ): IrExpression = when (dependency) {
-        is MissingDependency ->
-            getParameterValueByType(dependency.type) /** Represents: [_DocRefMissingDependencyDrill] */
+        is ExternalDependency ->
+            getParameterValueByType(dependency.type) /** Represents: [_DocRefExternalDependencyDrill] */
         is MatchFound ->
             factory.createCallExpression( /** Represents: [_DocRefInjectorCall] */
                 type = dependency.instantiatorOrInjectorFunction.owner.returnType,
@@ -169,7 +169,7 @@ internal class InjectionFunctionCreationSession(
                 ).functionSymbol,
                 extensionReceiver = injectionCacheReceiverParameterCreator(), /** Represents: [_DocRefThisValue] */
                 arguments = graph
-                    .allMissingDependenciesOf(dependency.instantiatorOrInjectorFunction)
+                    .allExternalDependenciesOf(dependency.instantiatorOrInjectorFunction)
                     .map { subDependency ->
                         createDependencyProvidingArgument(
                             subDependency,
@@ -212,25 +212,25 @@ internal class InjectionFunctionCreationSession(
  * For `barbs` it will generate:
  */
 
-private typealias _DocRefFunctionDeclaration = Nothing // ------> fun InjectionCache.Barbs(
-private typealias _DocRefMissingDependencyParameter = Nothing //>   bazbs: Bazbs,
-/** Same as      [_DocRefMissingDependencyParameter] */ // ----->   buz: Buz,
-private typealias _DocRefThisValue = Nothing // ----------------> ) = this
-private typealias _DocRefComputeIfAbsent = Nothing // ---------->   .computeIfAbsent(
-private typealias _DocRefKey = Nothing // ---------------------->     key = "moduleb.Barbs"
-private typealias _DocRefLambdaArgument = Nothing // ----------->     compute = {
-private typealias _DocRefInstantiatorCall = Nothing // --------->       barbs(
-private typealias _DocRefInjectorCall = Nothing // ------------->         bar = this.Bar(
-/** Same as      [_DocRefInjectorCall] */ // ------------------->           baz = this.Baz(
-private typealias _DocRefMissingDependencyDrill = Nothing // --->             bazbs = bazbs,
-                                                               //           ),
-/** Same as      [_DocRefMissingDependencyDrill] */ // --------->           buz = buz, // TODO: Do we need to handle missing dependencies recursively?
-                                                               //         )
-/** Same as      [_DocRefInjectorCall] */ // ------------------->         foobs = this.Foobs(),
-/** Same as      [_DocRefMissingDependencyDrill] */ // --------->         bazbs = bazbs,
-                                                               //       )
-                                                               //     }
-                                                               //   )
+private typealias _DocRefFunctionDeclaration = Nothing // -------> fun InjectionCache.Barbs(
+private typealias _DocRefExternalDependencyParameter = Nothing //>   bazbs: Bazbs,
+/** Same as      [_DocRefExternalDependencyParameter] */ // ----->   buz: Buz,
+private typealias _DocRefThisValue = Nothing // -----------------> ) = this
+private typealias _DocRefComputeIfAbsent = Nothing // ----------->   .computeIfAbsent(
+private typealias _DocRefKey = Nothing // ----------------------->     key = "moduleb.Barbs"
+private typealias _DocRefLambdaArgument = Nothing // ------------>     compute = {
+private typealias _DocRefInstantiatorCall = Nothing // ---------->       barbs(
+private typealias _DocRefInjectorCall = Nothing // -------------->         bar = this.Bar(
+/** Same as      [_DocRefInjectorCall] */ // -------------------->           baz = this.Baz(
+private typealias _DocRefExternalDependencyDrill = Nothing // --->             bazbs = bazbs,
+                                                                //           ),
+/** Same as      [_DocRefExternalDependencyDrill] */ // --------->           buz = buz,
+                                                                //         )
+/** Same as      [_DocRefInjectorCall] */ // -------------------->         foobs = this.Foobs(),
+/** Same as      [_DocRefExternalDependencyDrill] */ // --------->         bazbs = bazbs,
+                                                                //       )
+                                                                //     }
+                                                                //   )
 
 private val GeneratedBySink by IrStatementOriginImpl
 
@@ -402,12 +402,12 @@ internal fun IrSimpleType.typeArgumentsToString(
 
 internal object SinkPluginKey: GeneratedDeclarationKey()
 
-private fun DependencyGraph.allMissingDependenciesOf(function: IrFunctionSymbol): List<MissingDependency> =
-    instantiatorFunctionsToDependencies[function]?.allMissingDependencies() ?: emptyList()
+private fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
+    instantiatorFunctionsToDependencies[function]?.allExternalDependencies() ?: emptyList()
 
-private fun List<ResolvedDependency>.allMissingDependencies(): List<MissingDependency> = flatMap { dependency ->
+private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMap { dependency ->
     when (dependency) {
-        is MatchFound -> dependency.indirectDependencies.allMissingDependencies()
-        is MissingDependency -> listOf(dependency)
+        is MatchFound -> dependency.indirectDependencies.allExternalDependencies()
+        is ExternalDependency -> listOf(dependency)
     }
 }

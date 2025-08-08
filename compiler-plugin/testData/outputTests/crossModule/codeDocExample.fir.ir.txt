@@ -161,6 +161,8 @@ FILE fqName:__sink_metadata__ fileName:__GENERATED DECLARATIONS__.kt
         public open fun toString (): kotlin.String declared in kotlin.Any
   FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] name:_sinkMetadata_ visibility:public modality:FINAL returnType:kotlin.Unit
     VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] kind:Regular name:a index:0 type:__sink_metadata__._modulea__9545492147483647JVM__1_8_
+    annotations:
+      _SinkMetadata(data = "      modulea.Foo   modulea.Bar")
     BLOCK_BODY
 FILE fqName:_modulea_.__sink_metadata__ fileName:__sink_metadata__
   CLASS GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] INTERFACE name:_modulea__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[]
