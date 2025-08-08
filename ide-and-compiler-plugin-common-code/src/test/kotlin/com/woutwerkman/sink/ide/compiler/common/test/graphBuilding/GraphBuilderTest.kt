@@ -3,7 +3,6 @@ package com.woutwerkman.sink.ide.compiler.common.test.graphBuilding
 import com.woutwerkman.sink.ide.compiler.common.ConcreteType
 import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources
 import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
 import com.woutwerkman.sink.ide.compiler.common.TypeBehavior
 import com.woutwerkman.sink.ide.compiler.common.TypeVariance
@@ -16,6 +15,7 @@ import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.typeOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class GraphBuilderTest {
     @Test
@@ -25,9 +25,10 @@ class GraphBuilderTest {
         buildDiGraph {
             public func "foo".returns<Foo>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 1)
-            assert(graph.instantiatorFunctionsToDependencies.keys.single().name == "foo")
-            assert(graph.instantiatorFunctionsToDependencies.values.single().isEmpty())
+            graph.instantiatorFunctionsToDependencies.entries.single().also { (func, dependencies) ->
+                assert(func.name == "foo")
+                assert(dependencies.isEmpty())
+            }
         }
     }
 
@@ -63,7 +64,7 @@ class GraphBuilderTest {
                     .first { it.key.name == "bar" }
                     .value
                     .single()
-                    .let { it as DependencyGraphBuilder.ResolvedDependency.ImplementationDetail }
+                    .assertIs<ImplementationDetail>()
                     .instantiatorOrInjectorFunction
                     .name
             )
@@ -114,23 +115,35 @@ class GraphBuilderTest {
             public func "baz"("foo"<Foo>()).returns<Baz>()
         }.also { graph ->
             assert(graph.instantiatorFunctionsToDependencies.size == 2)
-            assertEquals(
-                "bar",
-                graph
-                    .instantiatorFunctionsToDependencies
-                    .entries
-                    .first { it.key.name == "baz" }
-                    .value
-                    .single()
-                    .let { it as DependencyGraphBuilder.ResolvedDependency.ImplementationDetail }
-                    .instantiatorOrInjectorFunction
-                    .name,
-            )
+            graph
+                .dependenciesForFunctionCalled("baz")
+                .single()
+                .assertIs<ImplementationDetail>()
+                .instantiatorOrInjectorFunction
+                .name
+                .assertIs("bar")
         }
     }
 }
 
+private inline fun <reified T> Any?.assertIs(): T =
+    if (this is T) this
+    else fail("Expected $this to be of type ${T::class.java.name}")
 
+private fun <T> T.assertIs(expected: T) {
+    assertEquals(expected, this)
+}
+
+private inline fun <T : Any> T?.assertNotNull(message: () -> String): T = this ?: fail(message())
+
+private fun DependencyGraphFromSources.dependenciesForFunctionCalled(
+    name: String
+): List<DependencyGraphBuilder.ResolvedDependency<KType, FunctionSymbol>> =
+    instantiatorFunctionsToDependencies
+        .entries
+        .firstOrNull { it.key.name == name }
+        .assertNotNull { "No function with name $name found among ${instantiatorFunctionsToDependencies.keys.map { it.name }}" }
+        .value
 
 interface TestDoubleFunctionBuilder {
     val public: DeclarationVisibility get() = DeclarationVisibility.Public
@@ -168,7 +181,7 @@ data class FunctionSignatureAndReturnType(val signature: FunctionSignature, val 
 
 fun buildDiGraph(
     builder: TestDoubleFunctionBuilder.() -> Unit,
-): DependencyGraphFromSources<FunctionSymbol, KType, KClass<*>> =
+): DependencyGraphFromSources =
     DependencyGraphBuilder(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior).buildGraph(
         injectablesOfThisModule = buildList {
             val module = object {}
@@ -185,6 +198,10 @@ fun buildDiGraph(
         },
         moduleDependencyGraphs = emptyList(),
     )
+
+private typealias DependencyGraphFromSources = com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources<FunctionSymbol, KType, KClass<*>>
+private typealias ImplementationDetail = com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<KType, FunctionSymbol>
+
 
 object TestDoubleFunctionAsInjectableBehavior : FunctionBehavior<KType, FunctionSymbol> {
     override fun getReturnTypeOf(injectable: FunctionSymbol): KType = injectable.returnType
