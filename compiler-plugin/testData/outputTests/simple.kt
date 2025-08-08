@@ -1,7 +1,7 @@
 package foo.bar
 
-import org.jetbrains.kotlin.compiler.plugin.template.Injectable
-import org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+import com.woutwerkman.sink.Injectable
+import com.woutwerkman.sink.InjectionCache
 
 interface Foo
 internal interface Bar

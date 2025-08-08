@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.compiler.plugin.template.Injectable
+import com.woutwerkman.sink.Injectable
 
 interface Foo
 interface Bar

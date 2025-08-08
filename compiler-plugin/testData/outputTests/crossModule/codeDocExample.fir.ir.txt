@@ -60,29 +60,29 @@ FILE fqName:modulea fileName:/fooAndBar.kt
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Bar visibility:public modality:FINAL returnType:modulea.Bar
-    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:baz index:1 type:modulea.Baz
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:buz index:2 type:modulea.Buz
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:Bar visibility:public modality:FINAL returnType:modulea.Bar
+    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:com.woutwerkman.sink.InjectionCache
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:baz index:1 type:modulea.Baz
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:buz index:2 type:modulea.Buz
     EXPRESSION_BODY
-      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=modulea.Bar origin=GeneratedBySink
+      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of com.woutwerkman.sink.InjectionCache.computeIfAbsent>): T of com.woutwerkman.sink.InjectionCache.computeIfAbsent declared in com.woutwerkman.sink.InjectionCache' type=modulea.Bar origin=GeneratedBySink
         TYPE_ARG T: modulea.Bar
-        ARG <this>: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Bar' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+        ARG <this>: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in modulea.Bar' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
         ARG key: CONST String type=kotlin.String value="modulea.Bar"
         ARG compute: FUN_EXPR type=kotlin.Function0<modulea.Bar> origin=LAMBDA
           FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL returnType:modulea.Bar
             EXPRESSION_BODY
               CALL 'public final fun bar (foo: modulea.Foo, baz: modulea.Baz, buz: modulea.Buz): modulea.Bar declared in modulea' type=modulea.Bar origin=GeneratedBySink
-                ARG foo: CALL 'public final fun Foo ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache): modulea.Foo declared in modulea' type=modulea.Foo origin=GeneratedBySink
-                  ARG $receiver: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Bar' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+                ARG foo: CALL 'public final fun Foo ($receiver: com.woutwerkman.sink.InjectionCache): modulea.Foo declared in modulea' type=modulea.Foo origin=GeneratedBySink
+                  ARG $receiver: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in modulea.Bar' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
                 ARG baz: GET_VAR 'baz: modulea.Baz declared in modulea.Bar' type=modulea.Baz origin=GeneratedBySink
                 ARG buz: GET_VAR 'buz: modulea.Buz declared in modulea.Bar' type=modulea.Buz origin=GeneratedBySink
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Foo visibility:public modality:FINAL returnType:modulea.Foo
-    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:Foo visibility:public modality:FINAL returnType:modulea.Foo
+    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:com.woutwerkman.sink.InjectionCache
     EXPRESSION_BODY
-      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=modulea.Foo origin=GeneratedBySink
+      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of com.woutwerkman.sink.InjectionCache.computeIfAbsent>): T of com.woutwerkman.sink.InjectionCache.computeIfAbsent declared in com.woutwerkman.sink.InjectionCache' type=modulea.Foo origin=GeneratedBySink
         TYPE_ARG T: modulea.Foo
-        ARG <this>: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in modulea.Foo' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+        ARG <this>: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in modulea.Foo' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
         ARG key: CONST String type=kotlin.String value="modulea.Foo"
         ARG compute: FUN_EXPR type=kotlin.Function0<modulea.Foo> origin=LAMBDA
           FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL returnType:modulea.Foo
@@ -144,7 +144,7 @@ FILE fqName:modulea fileName:/fooAndBar.kt
                 public open fun toString (): kotlin.String declared in modulea.Foo
           CONSTRUCTOR_CALL 'public constructor <init> () declared in modulea.foo.<no name provided>' type=modulea.foo.<no name provided> origin=OBJECT_LITERAL
 FILE fqName:__sink_metadata__ fileName:__GENERATED DECLARATIONS__.kt
-  CLASS GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedMetadataOverloadClass] INTERFACE name:_modulea__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[kotlin.Any]
+  CLASS GENERATED[com.woutwerkman.sink.SinkGeneratedMetadataOverloadClass] INTERFACE name:_modulea__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[kotlin.Any]
     thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:__sink_metadata__._modulea__9545492147483647JVM__1_8_
     FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN returnType:kotlin.Boolean [fake_override,operator]
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
@@ -159,16 +159,16 @@ FILE fqName:__sink_metadata__ fileName:__GENERATED DECLARATIONS__.kt
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] name:_sinkMetadata_ visibility:public modality:FINAL returnType:kotlin.Unit
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] kind:Regular name:a index:0 type:__sink_metadata__._modulea__9545492147483647JVM__1_8_
+  FUN GENERATED[com.woutwerkman.sink.SinkGeneratedDeclaration] name:_sinkMetadata_ visibility:public modality:FINAL returnType:kotlin.Unit
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.SinkGeneratedDeclaration] kind:Regular name:a index:0 type:__sink_metadata__._modulea__9545492147483647JVM__1_8_
     annotations:
       _SinkMetadata(data = "      modulea.Foo   modulea.Bar")
     BLOCK_BODY
 FILE fqName:_modulea_.__sink_metadata__ fileName:__sink_metadata__
-  CLASS GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] INTERFACE name:_modulea__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[]
-    thisReceiver: VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:DispatchReceiver name:<this> type:_modulea_.__sink_metadata__._modulea__9545492147483647JVM__1_8_
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:sinkMetadata visibility:public modality:FINAL returnType:kotlin.Unit
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:a index:0 type:_modulea_.__sink_metadata__._modulea__9545492147483647JVM__1_8_
+  CLASS GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] INTERFACE name:_modulea__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[]
+    thisReceiver: VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:DispatchReceiver name:<this> type:_modulea_.__sink_metadata__._modulea__9545492147483647JVM__1_8_
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:sinkMetadata visibility:public modality:FINAL returnType:kotlin.Unit
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:a index:0 type:_modulea_.__sink_metadata__._modulea__9545492147483647JVM__1_8_
     BLOCK_BODY
 Module: moduleb
 FILE fqName:moduleb fileName:/bazFoobsAndBarbs.kt
@@ -217,33 +217,33 @@ FILE fqName:moduleb fileName:/bazFoobsAndBarbs.kt
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Barbs visibility:public modality:FINAL returnType:moduleb.Barbs
-    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:bar index:1 type:modulea.Bar
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:foo index:2 type:modulea.Foo
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:bazbs index:3 type:moduleb.Bazbs
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:Barbs visibility:public modality:FINAL returnType:moduleb.Barbs
+    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:com.woutwerkman.sink.InjectionCache
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:bar index:1 type:modulea.Bar
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:foo index:2 type:modulea.Foo
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:bazbs index:3 type:moduleb.Bazbs
     EXPRESSION_BODY
-      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=moduleb.Barbs origin=GeneratedBySink
+      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of com.woutwerkman.sink.InjectionCache.computeIfAbsent>): T of com.woutwerkman.sink.InjectionCache.computeIfAbsent declared in com.woutwerkman.sink.InjectionCache' type=moduleb.Barbs origin=GeneratedBySink
         TYPE_ARG T: moduleb.Barbs
-        ARG <this>: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in moduleb.Barbs' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+        ARG <this>: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in moduleb.Barbs' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
         ARG key: CONST String type=kotlin.String value="moduleb.Barbs"
         ARG compute: FUN_EXPR type=kotlin.Function0<moduleb.Barbs> origin=LAMBDA
           FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL returnType:moduleb.Barbs
             EXPRESSION_BODY
               CALL 'public final fun barbs (bar: modulea.Bar, foobs: moduleb.Foobs, bazbs: moduleb.Bazbs): moduleb.Barbs declared in moduleb' type=moduleb.Barbs origin=GeneratedBySink
                 ARG bar: GET_VAR 'bar: modulea.Bar declared in moduleb.Barbs' type=modulea.Bar origin=GeneratedBySink
-                ARG foobs: CALL 'public final fun Foobs ($receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache, foo: modulea.Foo): moduleb.Foobs declared in moduleb' type=moduleb.Foobs origin=GeneratedBySink
-                  ARG $receiver: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in moduleb.Barbs' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+                ARG foobs: CALL 'public final fun Foobs ($receiver: com.woutwerkman.sink.InjectionCache, foo: modulea.Foo): moduleb.Foobs declared in moduleb' type=moduleb.Foobs origin=GeneratedBySink
+                  ARG $receiver: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in moduleb.Barbs' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
                   ARG foo: GET_VAR 'foo: modulea.Foo declared in moduleb.Barbs' type=modulea.Foo origin=GeneratedBySink
                 ARG bazbs: GET_VAR 'bazbs: moduleb.Bazbs declared in moduleb.Barbs' type=moduleb.Bazbs origin=GeneratedBySink
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Baz visibility:public modality:FINAL returnType:modulea.Baz
-    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:foo index:1 type:modulea.Foo
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:bazbs index:2 type:moduleb.Bazbs
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:Baz visibility:public modality:FINAL returnType:modulea.Baz
+    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:com.woutwerkman.sink.InjectionCache
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:foo index:1 type:modulea.Foo
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:bazbs index:2 type:moduleb.Bazbs
     EXPRESSION_BODY
-      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=modulea.Baz origin=GeneratedBySink
+      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of com.woutwerkman.sink.InjectionCache.computeIfAbsent>): T of com.woutwerkman.sink.InjectionCache.computeIfAbsent declared in com.woutwerkman.sink.InjectionCache' type=modulea.Baz origin=GeneratedBySink
         TYPE_ARG T: modulea.Baz
-        ARG <this>: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in moduleb.Baz' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+        ARG <this>: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in moduleb.Baz' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
         ARG key: CONST String type=kotlin.String value="modulea.Baz"
         ARG compute: FUN_EXPR type=kotlin.Function0<modulea.Baz> origin=LAMBDA
           FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL returnType:modulea.Baz
@@ -251,13 +251,13 @@ FILE fqName:moduleb fileName:/bazFoobsAndBarbs.kt
               CALL 'public final fun baz (foo: modulea.Foo, bazbs: moduleb.Bazbs): modulea.Baz declared in moduleb' type=modulea.Baz origin=GeneratedBySink
                 ARG foo: GET_VAR 'foo: modulea.Foo declared in moduleb.Baz' type=modulea.Foo origin=GeneratedBySink
                 ARG bazbs: GET_VAR 'bazbs: moduleb.Bazbs declared in moduleb.Baz' type=moduleb.Bazbs origin=GeneratedBySink
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:Foobs visibility:public modality:FINAL returnType:moduleb.Foobs
-    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:org.jetbrains.kotlin.compiler.plugin.template.InjectionCache
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:foo index:1 type:modulea.Foo
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:Foobs visibility:public modality:FINAL returnType:moduleb.Foobs
+    VALUE_PARAMETER kind:ExtensionReceiver name:$receiver index:0 type:com.woutwerkman.sink.InjectionCache
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:foo index:1 type:modulea.Foo
     EXPRESSION_BODY
-      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent>): T of org.jetbrains.kotlin.compiler.plugin.template.InjectionCache.computeIfAbsent declared in org.jetbrains.kotlin.compiler.plugin.template.InjectionCache' type=moduleb.Foobs origin=GeneratedBySink
+      CALL 'public abstract fun computeIfAbsent <T> (key: kotlin.Any?, compute: kotlin.Function0<T of com.woutwerkman.sink.InjectionCache.computeIfAbsent>): T of com.woutwerkman.sink.InjectionCache.computeIfAbsent declared in com.woutwerkman.sink.InjectionCache' type=moduleb.Foobs origin=GeneratedBySink
         TYPE_ARG T: moduleb.Foobs
-        ARG <this>: GET_VAR '$receiver: org.jetbrains.kotlin.compiler.plugin.template.InjectionCache declared in moduleb.Foobs' type=org.jetbrains.kotlin.compiler.plugin.template.InjectionCache origin=GeneratedBySink
+        ARG <this>: GET_VAR '$receiver: com.woutwerkman.sink.InjectionCache declared in moduleb.Foobs' type=com.woutwerkman.sink.InjectionCache origin=GeneratedBySink
         ARG key: CONST String type=kotlin.String value="moduleb.Foobs"
         ARG compute: FUN_EXPR type=kotlin.Function0<moduleb.Foobs> origin=LAMBDA
           FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL returnType:moduleb.Foobs
@@ -349,7 +349,7 @@ FILE fqName:moduleb fileName:/bazFoobsAndBarbs.kt
                 public open fun toString (): kotlin.String declared in moduleb.Foobs
           CONSTRUCTOR_CALL 'public constructor <init> () declared in moduleb.foobs.<no name provided>' type=moduleb.foobs.<no name provided> origin=OBJECT_LITERAL
 FILE fqName:__sink_metadata__ fileName:__GENERATED DECLARATIONS__.kt
-  CLASS GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedMetadataOverloadClass] INTERFACE name:_moduleb__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[kotlin.Any]
+  CLASS GENERATED[com.woutwerkman.sink.SinkGeneratedMetadataOverloadClass] INTERFACE name:_moduleb__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[kotlin.Any]
     thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:__sink_metadata__._moduleb__9545492147483647JVM__1_8_
     FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN returnType:kotlin.Boolean [fake_override,operator]
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
@@ -364,12 +364,12 @@ FILE fqName:__sink_metadata__ fileName:__GENERATED DECLARATIONS__.kt
       VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
       overridden:
         public open fun toString (): kotlin.String declared in kotlin.Any
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] name:_sinkMetadata_ visibility:public modality:FINAL returnType:kotlin.Unit
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.SinkGeneratedDeclaration] kind:Regular name:a index:0 type:__sink_metadata__._moduleb__9545492147483647JVM__1_8_
+  FUN GENERATED[com.woutwerkman.sink.SinkGeneratedDeclaration] name:_sinkMetadata_ visibility:public modality:FINAL returnType:kotlin.Unit
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.SinkGeneratedDeclaration] kind:Regular name:a index:0 type:__sink_metadata__._moduleb__9545492147483647JVM__1_8_
     BLOCK_BODY
 FILE fqName:_moduleb_.__sink_metadata__ fileName:__sink_metadata__
-  CLASS GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] INTERFACE name:_moduleb__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[]
-    thisReceiver: VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:DispatchReceiver name:<this> type:_moduleb_.__sink_metadata__._moduleb__9545492147483647JVM__1_8_
-  FUN GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] name:sinkMetadata visibility:public modality:FINAL returnType:kotlin.Unit
-    VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.compiler.plugin.template.ir.SinkPluginKey] kind:Regular name:a index:0 type:_moduleb_.__sink_metadata__._moduleb__9545492147483647JVM__1_8_
+  CLASS GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] INTERFACE name:_moduleb__9545492147483647JVM__1_8_ modality:SEALED visibility:public superTypes:[]
+    thisReceiver: VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:DispatchReceiver name:<this> type:_moduleb_.__sink_metadata__._moduleb__9545492147483647JVM__1_8_
+  FUN GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] name:sinkMetadata visibility:public modality:FINAL returnType:kotlin.Unit
+    VALUE_PARAMETER GENERATED[com.woutwerkman.sink.ir.SinkPluginKey] kind:Regular name:a index:0 type:_moduleb_.__sink_metadata__._moduleb__9545492147483647JVM__1_8_
     BLOCK_BODY

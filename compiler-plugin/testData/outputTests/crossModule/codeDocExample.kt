@@ -2,7 +2,7 @@
 // FILE: fooAndBar.kt
 package modulea
 
-import org.jetbrains.kotlin.compiler.plugin.template.Injectable
+import com.woutwerkman.sink.Injectable
 
 interface Foo
 interface Bar
@@ -19,7 +19,7 @@ fun bar(foo: Foo, baz: Baz, buz: Buz): Bar = object : Bar {}
 // FILE: bazFoobsAndBarbs.kt
 package moduleb
 
-import org.jetbrains.kotlin.compiler.plugin.template.Injectable
+import com.woutwerkman.sink.Injectable
 import modulea.Foo
 import modulea.Bar
 import modulea.Baz
