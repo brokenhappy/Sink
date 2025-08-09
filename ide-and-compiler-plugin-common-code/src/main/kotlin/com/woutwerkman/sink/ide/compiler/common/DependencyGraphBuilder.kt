@@ -348,7 +348,12 @@ data class DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol
         buffer.writeInt(instantiatorFunctionsToDependencies.size)
         for (injectable in instantiatorFunctionsToDependencies.keys) {
             val fqnBytes =  (
-                injectable.fqn.substringBeforeLast(".").let { if (it.isEmpty()) "" else "$it." } +
+                injectable
+                    .fqn
+                    .takeIf { '.' in it }
+                    ?.substringBeforeLast(".")
+                    ?.let { if (it.isEmpty()) "" else "$it." }
+                    .let { it ?: "" } +
                     typeBehavior.injectorFunctionNameOf(injectable.returnType)
             ).encodeToByteArray()
             buffer.writeInt(fqnBytes.size)
