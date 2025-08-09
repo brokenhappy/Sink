@@ -90,7 +90,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                 else ResolvedDependency.ImplementationDetail(
                     parameterName = name,
                     matches.single(),
-                    recurse(matches.single()), // TODO: Handle ambiguous
+                    emptyList(),
                 )
             }
     }
