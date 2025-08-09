@@ -23,7 +23,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
              * In case of a function in a dependency module, this function is an [InjectorFunctionDocRef].
              */
             val instantiatorOrInjectorFunction: FunctionSymbol,
-            val indirectDependencies: List<ResolvedDependency<TypeExpression, FunctionSymbol>>,
+            val indirectDependencies: List<ExternalDependency<TypeExpression, FunctionSymbol>>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol>()
         data class ExternalDependency<TypeExpression, FunctionSymbol>(
             val parameterName: String,
@@ -196,7 +196,8 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                 when (indirectDependency) {
                     is ResolvedDependency.ImplementationDetail -> indirectDependency.copy(
                         indirectDependencies = recurse(indirectDependency.instantiatorOrInjectorFunction)
-                            .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module),
+                            .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module)
+                            .mapNotNull { it as? ResolvedDependency.ExternalDependency },
                     )
                     is ResolvedDependency.ExternalDependency -> {
                         if (moduleThatResolvedThisDependency != module) {
@@ -221,7 +222,8 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                                         parameterName = indirectDependency.parameterName,
                                         instantiatorOrInjectorFunction = candidateFromThisModule,
                                         indirectDependencies = recurse(candidateFromThisModule)
-                                            .resolvingCrossModuleDependencies(candidateFromThisModule.module),
+                                            .resolvingCrossModuleDependencies(candidateFromThisModule.module)
+                                            .mapNotNull { it as? ResolvedDependency.ExternalDependency },
                                     )
                             } ?: indirectDependency
                         } else {
