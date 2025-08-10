@@ -196,7 +196,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                             .plusLikelyEmpty(
                                 recurse(indirectDependency.instantiatorOrInjectorFunction)
 //                                    .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module)
-                                    .mapNotNullLikelySingle { it as? ResolvedDependency.ExternalDependency }
+                                    .mapNotNullLikely0Or1 { it as? ResolvedDependency.ExternalDependency }
                             )
                     is ResolvedDependency.ExternalDependency -> {
                          if (moduleThatResolvedThisDependency != module) {
@@ -231,13 +231,24 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                     }
                 }
             }.let { newDependencies ->
-                val names = HashSet<String>(newDependencies.size)
-                newDependencies.map { dependency ->
-                    if (names.add(dependency.parameterName)) dependency
-                    else generateSequence(0) { it + 1 }
-                        .map { dependency.parameterName + it }
-                        .first { names.add(it) }
-                        .let { dependency.withParameterName(it) }
+                val externalDependencies = newDependencies.mapNotNullLikely0Or1 { it as? ResolvedDependency.ExternalDependency }
+                if (externalDependencies.isEmpty()) newDependencies
+                else {
+                    val itemsToRemoveBecauseWeAlreadyHaveASupertypeAdded = externalDependencies
+                        .filterIndexedTo(Collections.newSetFromMap(IdentityHashMap())) { i, it ->
+                            ((i + 1)..<externalDependencies.size).any { j ->
+                                typeBehavior.isSubtype(it.type, externalDependencies[j].type)
+                            }
+                        }
+                    val names = HashSet<String>(newDependencies.size)
+                    newDependencies.mapNotNull { dependency ->
+                        if (dependency in itemsToRemoveBecauseWeAlreadyHaveASupertypeAdded) null
+                        else if (names.add(dependency.parameterName)) dependency
+                        else generateSequence(0) { it + 1 }
+                            .map { dependency.parameterName + it }
+                            .first { names.add(it) }
+                            .let { dependency.withParameterName(it) }
+                    }
                 }
             }
 
@@ -485,7 +496,7 @@ internal fun <TypeExpression, FunctionSymbol, TypeSymbol> Map<TypeSymbol, List<F
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, behavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
 private fun <TypeExpression, TypeSymbol, FunctionSymbol> Iterable<FunctionSymbol>.pickCandidatesToProvide(
     type: TypeExpression
-): List<FunctionSymbol> = filterLikelySingle { injectable -> behavior.isSubtype(injectable.returnType, type) }
+): List<FunctionSymbol> = filterLikely0Or1 { injectable -> behavior.isSubtype(injectable.returnType, type) }
 
 private inline fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R> = when (size) {
     0 -> emptyList()
@@ -494,11 +505,11 @@ private inline fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R
 }
 
 /** Tries to reduce allocations for filter operations that are likely to zero or one item */
-private inline fun <T> Iterable<T>.filterLikelySingle(predicate: (T) -> Boolean): List<T> =
-    mapNotNullLikelySingle { it.takeIf(predicate) }
+private inline fun <T> Iterable<T>.filterLikely0Or1(predicate: (T) -> Boolean): List<T> =
+    mapNotNullLikely0Or1 { it.takeIf(predicate) }
 
 /** Tries to reduce allocations for mapNotNull operations that are likely to zero or one item */
-private inline fun <T, R : Any> Iterable<T>.mapNotNullLikelySingle(predicate: (T) -> R?): List<R> {
+private inline fun <T, R : Any> Iterable<T>.mapNotNullLikely0Or1(predicate: (T) -> R?): List<R> {
     var singleResult: R? = null
     var multipleResult: MutableList<R>? = null
     for (element in this) {

@@ -138,6 +138,25 @@ class GraphBuilderTest {
     }
 
     @Test
+    fun `double transitive dependency does not duplicate dependency`() {
+        class Foo
+        class Bar
+        class Baz
+        class Foobs
+
+        buildDiGraph {
+            public func "foo"("foobs"<Foobs>()).returns<Foo>()
+            public func "bar"("foobs"<Foobs>()).returns<Bar>()
+            public func "baz"("bar"<Bar>(), "foo"<Foo>()).returns<Baz>()
+        }.also { graph ->
+            graph.instantiatorFunctionsToDependencies.size.assertIs(3)
+            graph
+                .dependenciesForFunctionCalled("baz")
+                .assert { it.size == 3 }
+        }
+    }
+
+    @Test
     fun `dependency by simple subtype`() {
         open class Foo
         class Bar : Foo()
