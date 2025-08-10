@@ -7,6 +7,8 @@ import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
 import com.woutwerkman.sink.ide.compiler.common.TypeBehavior
 import com.woutwerkman.sink.ide.compiler.common.TypeVariance
 import com.woutwerkman.sink.ide.compiler.common.WithVariance
+import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
+import com.woutwerkman.sink.ide.compiler.common.moduleDependencyGraphFromBytes
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeParameter
@@ -18,6 +20,17 @@ import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class GraphBuilderTest {
+    @Test
+    fun `empty module yields empty graph`() {
+        buildDiGraph {
+            // no functions
+        }.also { graph ->
+            assert(graph.instantiatorFunctionsToDependencies.isEmpty())
+            assert(graph.cycles.isEmpty())
+            assert(graph.duplicates.isEmpty())
+        }
+    }
+
     @Test
     fun `single injectable without dependencies`() {
         class Foo
@@ -41,8 +54,29 @@ class GraphBuilderTest {
             public func "foo".returns<Foo>()
             public func "bar".returns<Bar>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 2)
-            assert(graph.instantiatorFunctionsToDependencies.values.flatten().isEmpty())
+            graph.instantiatorFunctionsToDependencies.values.also { dependencies ->
+                dependencies.size.assertIs(2)
+                dependencies.flatten().assert { it.isEmpty() }
+            }
+        }
+    }
+
+    @Test
+    fun `unresolved dependency becomes external`() {
+        class Foo
+        class Bar
+
+        buildDiGraph {
+            public func "bar"("foo"<Foo>()).returns<Bar>()
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("bar")
+                .single()
+                .assertIs<ExternalDependency>()
+                .also { externalDependency ->
+                    externalDependency.parameterName.assertIs("foo")
+                    externalDependency.type.assertIs(typeOf<Foo>())
+                }
         }
     }
 
@@ -56,18 +90,13 @@ class GraphBuilderTest {
             public func "bar"("foo"<Foo>()).returns<Bar>()
         }.also { graph ->
             assert(graph.instantiatorFunctionsToDependencies.size == 2)
-            assertEquals(
-                "foo",
-                graph
-                    .instantiatorFunctionsToDependencies
-                    .entries
-                    .first { it.key.name == "bar" }
-                    .value
-                    .single()
-                    .assertIs<ImplementationDetail>()
-                    .instantiatorOrInjectorFunction
-                    .name
-            )
+            graph
+                .dependenciesForFunctionCalled("bar")
+                .single()
+                .assertIs<ImplementationDetail>()
+                .instantiatorOrInjectorFunction
+                .name
+                .assertIs("foo")
         }
     }
 
@@ -79,11 +108,13 @@ class GraphBuilderTest {
             public func "foo".returns<Foo>()
             public func "bar".returns<Foo>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 2)
-            assertEquals(
-                setOf("bar", "foo"),
-                graph.duplicates.single().map { it.name }.toSet(),
-            )
+            graph.instantiatorFunctionsToDependencies.size.assertIs(2)
+            graph
+                .duplicates
+                .single()
+                .map { it.name }
+                .toSet()
+                .assertIs(setOf("bar", "foo"))
         }
     }
 
@@ -96,11 +127,13 @@ class GraphBuilderTest {
             public func "foo"("bar"<Bar>()).returns<Foo>()
             public func "bar"("foo"<Foo>()).returns<Bar>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 2)
-            assertEquals(
-                setOf("bar", "foo"),
-                graph.cycles.single().map { it.name }.toSet(),
-            )
+            graph.instantiatorFunctionsToDependencies.size.assertIs(2)
+            graph
+                .cycles
+                .single()
+                .map { it.name }
+                .toSet()
+                .assertIs(setOf("bar", "foo"))
         }
     }
 
@@ -114,7 +147,7 @@ class GraphBuilderTest {
             public func "bar".returns<Bar>()
             public func "baz"("foo"<Foo>()).returns<Baz>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 2)
+            graph.instantiatorFunctionsToDependencies.size.assertIs(2)
             graph
                 .dependenciesForFunctionCalled("baz")
                 .single()
@@ -122,6 +155,77 @@ class GraphBuilderTest {
                 .instantiatorOrInjectorFunction
                 .name
                 .assertIs("bar")
+        }
+    }
+
+    @Test
+    fun `multiple parameters resolved in order`() {
+        class Foo
+        class Bar
+        class Baz
+
+        buildDiGraph {
+            public func "foo".returns<Foo>()
+            public func "bar".returns<Bar>()
+            public func "baz"("foo"<Foo>(), "bar"<Bar>()).returns<Baz>()
+        }.also { graph ->
+            val deps = graph.dependenciesForFunctionCalled("baz")
+            deps.size.assertIs(2)
+            deps[0].assertIs<ImplementationDetail>().instantiatorOrInjectorFunction.name.assertIs("foo")
+            deps[1].assertIs<ImplementationDetail>().instantiatorOrInjectorFunction.name.assertIs("bar")
+        }
+    }
+
+    @Test
+    fun `transitive external dependency chain is captured`() {
+        class Foo
+        class Bar
+        class Baz
+
+        buildDiGraph {
+            public func "bar"("foo"<Foo>()).returns<Bar>()
+            public func "baz"("bar"<Bar>()).returns<Baz>()
+        }.also { graph ->
+            val bazDependencies = graph.dependenciesForFunctionCalled("baz").assert { it.size == 2 }
+            val fooDep = bazDependencies.filterIsInstance<ExternalDependency>().single()
+            val barDep = bazDependencies.filterIsInstance<ImplementationDetail>().single()
+            fooDep.parameterName.assertIs("foo")
+            fooDep.type.assertIs(typeOf<Foo>())
+            barDep.parameterName.assertIs("bar")
+        }
+    }
+
+    @Test
+    fun `dependency by interface subtype`() {
+        abstract class Foo
+        class Bar: Foo()
+        class Baz
+
+        buildDiGraph {
+            public func "bar".returns<Bar>()
+            public func "baz"("foo"<Foo>()).returns<Baz>()
+        }.also { graph ->
+            val dep = graph.dependenciesForFunctionCalled("baz").single().assertIs<ImplementationDetail>()
+            dep.instantiatorOrInjectorFunction.name.assertIs("bar")
+        }
+    }
+
+    @Test
+    fun `cross module dependency is resolved by this module`() {
+        class Foo
+        class Bar
+        class Baz
+
+        buildDiGraph(
+            buildDiGraph {
+                public func "bar"("foo"<Foo>()).returns<Bar>()
+            }.toModuleGraph(),
+        ) {
+            public func "foo".returns<Foo>()
+            public func "baz"("bar"<Bar>()).returns<Baz>()
+        }.also { graph ->
+            val bazDep = graph.dependenciesForFunctionCalled("baz").single().assertIs<ImplementationDetail>()
+            bazDep.instantiatorOrInjectorFunction.name.assertIs("Bar")
         }
     }
 }
@@ -133,6 +237,10 @@ private inline fun <reified T> Any?.assertIs(): T =
 private fun <T> T.assertIs(expected: T) {
     assertEquals(expected, this)
 }
+
+private fun <T> T.assert(assertion: (T) -> Boolean): T =
+    if (!assertion(this)) fail("Assertion failed for $this")
+    else this
 
 private inline fun <T : Any> T?.assertNotNull(message: () -> String): T = this ?: fail(message())
 
@@ -180,6 +288,7 @@ data class FunctionSignature(val name: String, val parameters: List<Parameter>)
 data class FunctionSignatureAndReturnType(val signature: FunctionSignature, val returnType: KType)
 
 fun buildDiGraph(
+    vararg dependencies: ModuleDependencyGraph,
     builder: TestDoubleFunctionBuilder.() -> Unit,
 ): DependencyGraphFromSources =
     DependencyGraphBuilder(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior).buildGraph(
@@ -196,11 +305,31 @@ fun buildDiGraph(
                 }
             })
         },
-        moduleDependencyGraphs = emptyList(),
+        moduleDependencyGraphs = dependencies.toList(),
     )
 
+private fun DependencyGraphFromSources.toModuleGraph(): ModuleDependencyGraph {
+    val resolverMap = instantiatorFunctionsToDependencies.keys.associate { original ->
+        val fqn = KTypeBehavior.injectorFunctionNameOf(original.returnType)
+        fqn to FunctionSymbol(
+            visibility = DeclarationVisibility.Public,
+            name = fqn,
+            parameters = original.parameters,
+            returnType = original.returnType,
+        )
+    }
+    return context(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior) {
+        moduleDependencyGraphFromBytes(
+            injectorResolver = { name: String -> resolverMap[name] ?: error("Unknown injector $name") },
+            bytes = serializeAsModuleDependencyGraph(),
+        )
+    }
+}
+
 private typealias DependencyGraphFromSources = com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources<FunctionSymbol, KType, KClass<*>>
+private typealias ModuleDependencyGraph = com.woutwerkman.sink.ide.compiler.common.ModuleDependencyGraph<FunctionSymbol, KType, KClass<*>>
 private typealias ImplementationDetail = com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<KType, FunctionSymbol>
+private typealias ExternalDependency = com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ExternalDependency<KType, FunctionSymbol>
 
 
 object TestDoubleFunctionAsInjectableBehavior : FunctionBehavior<KType, FunctionSymbol> {
