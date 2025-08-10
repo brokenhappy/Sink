@@ -97,7 +97,8 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = graph.allExternalDependenciesOf(instantiator.symbol).map { dependency ->
+                parameters = graph
+                    .allExternalDependenciesOf(instantiator.symbol).map { dependency ->
                     pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefExternalDependencyParameter] */
                         startOffset = instantiator.startOffset,
                         endOffset = instantiator.endOffset,
@@ -407,11 +408,4 @@ internal fun IrSimpleType.typeArgumentsToString(
 internal object SinkPluginKey: GeneratedDeclarationKey()
 
 private fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
-    instantiatorFunctionsToDependencies[function]?.allExternalDependencies() ?: emptyList()
-
-private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMapLikelySingle { dependency ->
-    when (dependency) {
-        is ImplementationDetail -> dependency.indirectDependencies.allExternalDependencies()
-        is ExternalDependency -> listOf(dependency)
-    }
-}
+    instantiatorFunctionsToDependencies[function]?.filterIsInstance<ExternalDependency>() ?: emptyList()

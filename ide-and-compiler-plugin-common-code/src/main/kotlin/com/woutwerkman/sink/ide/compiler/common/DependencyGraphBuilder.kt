@@ -23,7 +23,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
              * In case of a function in a dependency module, this function is an [InjectorFunctionDocRef].
              */
             val instantiatorOrInjectorFunction: FunctionSymbol,
-            val indirectDependencies: List<ExternalDependency<TypeExpression, FunctionSymbol>>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol>()
         data class ExternalDependency<TypeExpression, FunctionSymbol>(
             val parameterName: String,
@@ -46,7 +45,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             moduleDependencyGraphs = moduleDependencyGraphs,
         )
             .hydrateShallowDependencies()
-            .withIndirectExternalDependencies(module)
+            .withTransitiveExternalDependencies(module)
             .detectingCycles()
             .detectingDuplicates(moduleDependencyGraphs)
     }
@@ -90,7 +89,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                 else ResolvedDependency.ImplementationDetail(
                     parameterName = name,
                     matches.single(),
-                    emptyList(),
                 )
             }
     }
@@ -184,28 +182,26 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
         typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
     )
-    private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.withIndirectExternalDependencies(
+    private fun DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol>.withTransitiveExternalDependencies(
         module: Any?
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol> =
         mapDependenciesRecursivelyMemoized { injectable, dependencies ->
             // TODO: If we support more narrow scoped injectables. We should handle it here? Kinda similar to module border crossing
-            val names = mutableSetOf<String>()
             fun List<ResolvedDependency<TypeExpression, FunctionSymbol>>.resolvingCrossModuleDependencies(
                 moduleThatResolvedThisDependency: Any?,
-            ): List<ResolvedDependency<TypeExpression, FunctionSymbol>> = mapNotNull { indirectDependency ->
+            ): List<ResolvedDependency<TypeExpression, FunctionSymbol>> = flatMap { indirectDependency ->
                 when (indirectDependency) {
-                    is ResolvedDependency.ImplementationDetail -> indirectDependency.copy(
-                        indirectDependencies = recurse(indirectDependency.instantiatorOrInjectorFunction)
-                            .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module)
-                            .mapNotNull { it as? ResolvedDependency.ExternalDependency },
-                    )
+                    is ResolvedDependency.ImplementationDetail ->
+                        listOf(indirectDependency)
+                            .plusLikelyEmpty(
+                                recurse(indirectDependency.instantiatorOrInjectorFunction)
+//                                    .resolvingCrossModuleDependencies(indirectDependency.instantiatorOrInjectorFunction.module)
+                                    .mapNotNullLikelySingle { it as? ResolvedDependency.ExternalDependency }
+                            )
                     is ResolvedDependency.ExternalDependency -> {
-                        if (moduleThatResolvedThisDependency != module) {
+                         if (moduleThatResolvedThisDependency != module) {
                             // The original declaration that depended on this could not resolve this dependency.
                             // However, we are a different module. We can try again!
-
-                            // TODO: First: It might be that the user (perhaps unknowingly) added
-                            // TODO: the indirect external dependency to their own dependencies already (Removed the logic, needs verification)
                             findCandidatesForType(indirectDependency.type)
                                 .singleOrNull() // TODO: Handle ambiguous
                                 ?.let { candidateFromThisModule ->
@@ -218,25 +214,31 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
                                     //    - And we were able to satisfy this dependency in our own module
                                     // The newly added dependency might again have its own external dependencies.
                                     // So we recurse down its external dependencies as well.
-                                    ResolvedDependency.ImplementationDetail(
-                                        parameterName = indirectDependency.parameterName,
-                                        instantiatorOrInjectorFunction = candidateFromThisModule,
-                                        indirectDependencies = recurse(candidateFromThisModule)
-                                            .resolvingCrossModuleDependencies(candidateFromThisModule.module)
-                                            .mapNotNull { it as? ResolvedDependency.ExternalDependency },
+                                    listOf(
+                                        ResolvedDependency.ImplementationDetail<TypeExpression, FunctionSymbol>(
+                                            parameterName = indirectDependency.parameterName,
+                                            instantiatorOrInjectorFunction = candidateFromThisModule,
+                                        )
+                                    ).plusLikelyEmpty(
+                                        recurse(candidateFromThisModule)
+//                                            .resolvingCrossModuleDependencies(candidateFromThisModule.module)
+                                            .mapNotNull { it as? ResolvedDependency.ExternalDependency }
                                     )
-                            } ?: indirectDependency
+                            } ?: listOf(indirectDependency)
                         } else {
-                            indirectDependency
+                            listOf(indirectDependency)
                         }
                     }
                 }
-            }.map { dependency ->
-                if (names.add(dependency.parameterName)) dependency
-                else generateSequence(0) { it + 1 }
-                    .map { dependency.parameterName + it }
-                    .first { names.add(it) }
-                    .let { dependency.withParameterName(it) }
+            }.let { newDependencies ->
+                val names = HashSet<String>(newDependencies.size)
+                newDependencies.map { dependency ->
+                    if (names.add(dependency.parameterName)) dependency
+                    else generateSequence(0) { it + 1 }
+                        .map { dependency.parameterName + it }
+                        .first { names.add(it) }
+                        .let { dependency.withParameterName(it) }
+                }
             }
 
             dependencies.resolvingCrossModuleDependencies(injectable.module)
@@ -408,17 +410,6 @@ private fun ByteArrayOutputStream.writeInt(size: Int) {
     write((size shr 24) and 0xFF)
 }
 
-private fun <TypeExpression, FunctionSymbol> List<ResolvedDependency<TypeExpression, FunctionSymbol>>.forEachExternalDependencyRecursive(
-    function: (ResolvedDependency.ExternalDependency<TypeExpression, FunctionSymbol>) -> Unit,
-) {
-    forEach { dependency ->
-        when (dependency) {
-            is ResolvedDependency.ImplementationDetail -> dependency.indirectDependencies.forEachExternalDependencyRecursive(function)
-            is ResolvedDependency.ExternalDependency -> function(dependency)
-        }
-    }
-}
-
 private fun ByteArray.readIntAt(i: Int): Int =
     this[i].toInt() +
         this[i + 1].toInt().shr(8) +
@@ -503,11 +494,15 @@ private inline fun <T, R> Collection<T>.mapLikelyEmpty(mapper: (T) -> R): List<R
 }
 
 /** Tries to reduce allocations for filter operations that are likely to zero or one item */
-private inline fun <T> Iterable<T>.filterLikelySingle(predicate: (T) -> Boolean): List<T> {
-    var singleResult: T? = null
-    var multipleResult: MutableList<T>? = null
+private inline fun <T> Iterable<T>.filterLikelySingle(predicate: (T) -> Boolean): List<T> =
+    mapNotNullLikelySingle { it.takeIf(predicate) }
+
+/** Tries to reduce allocations for mapNotNull operations that are likely to zero or one item */
+private inline fun <T, R : Any> Iterable<T>.mapNotNullLikelySingle(predicate: (T) -> R?): List<R> {
+    var singleResult: R? = null
+    var multipleResult: MutableList<R>? = null
     for (element in this) {
-        if (!predicate(element)) continue
+        val element = predicate(element) ?: continue
         if (singleResult != null) {
             multipleResult = multipleResult ?: mutableListOf(singleResult)
             multipleResult.add(element)
