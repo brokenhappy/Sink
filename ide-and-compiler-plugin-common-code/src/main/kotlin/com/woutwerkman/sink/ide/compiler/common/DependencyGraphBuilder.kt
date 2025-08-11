@@ -58,11 +58,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
             }
         }
 
-    private val ResolvedDependency<*, *>.parameterName get(): String = when (this) {
-        is ResolvedDependency.ImplementationDetail -> parameterName
-        is ResolvedDependency.ExternalDependency -> parameterName
-    }
-
     private fun ResolvedDependency<TypeExpression, FunctionSymbol>.withParameterName(newName: String): ResolvedDependency<TypeExpression, FunctionSymbol> = when (this) {
         is ResolvedDependency.ExternalDependency -> copy(parameterName = newName)
         is ResolvedDependency.ImplementationDetail -> copy(parameterName = newName)
@@ -280,6 +275,12 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol>(
         })
     }
 }
+
+internal val ResolvedDependency<*, *>.parameterName get(): String = when (this) {
+    is ResolvedDependency.ImplementationDetail -> parameterName
+    is ResolvedDependency.ExternalDependency -> parameterName
+}
+
 
 context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
 private fun <
