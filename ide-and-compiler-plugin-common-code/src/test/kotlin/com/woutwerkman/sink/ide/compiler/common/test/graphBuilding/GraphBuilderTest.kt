@@ -9,6 +9,7 @@ import com.woutwerkman.sink.ide.compiler.common.TypeVariance
 import com.woutwerkman.sink.ide.compiler.common.WithVariance
 import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import com.woutwerkman.sink.ide.compiler.common.moduleDependencyGraphFromBytes
+import com.woutwerkman.sink.ide.compiler.common.parameterName
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeParameter
@@ -174,6 +175,26 @@ class GraphBuilderTest {
                 .instantiatorOrInjectorFunction
                 .name
                 .assertIs("bar")
+        }
+    }
+
+    @Test
+    fun `parameter name implicitly duplicated through transitive external dependency creates unique name`() {
+        class Foo
+        class Bar
+        class Baz
+
+        buildDiGraph {
+            public func "bar"("foo"<Foo>()).returns<Bar>()
+            public func "baz"("foo"<Bar>()).returns<Baz>()
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("baz")
+                .map { it.parameterName }
+                .toSet()
+                .assert { "foo" in it } // Probably == setOf("foo", "foo0"), but we don't care about the rename ...
+                .size
+                .assertIs(2) // ... as long as it's unique
         }
     }
 
