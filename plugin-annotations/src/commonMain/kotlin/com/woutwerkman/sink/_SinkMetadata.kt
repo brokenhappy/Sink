@@ -1,4 +1,4 @@
-package com.woutwerkman.sink.compiler.plugin
+package com.woutwerkman.sink
 
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.BINARY)

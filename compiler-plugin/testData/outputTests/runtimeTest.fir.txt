@@ -1,0 +1,28 @@
+FILE: runtimeTest.kt
+    public abstract interface Foo : R|kotlin/Any| {
+        public abstract fun getText(): R|kotlin/String|
+
+    }
+    @<ERROR TYPE REF: Symbol not found for Injectable>() private final fun foo(): R|Foo| {
+        ^foo object : R|Foo| {
+            private constructor(): R|<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun getText(): R|kotlin/String| {
+                ^getText String(OK)
+            }
+
+        }
+
+    }
+    public final fun box(): R|kotlin/String| {
+        ^box <Unresolved name: InjectionCache>#().<Unresolved name: Foo>#().<Unresolved name: getText>#()
+    }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_main__9545492147483647JVM__1_8_|): R|kotlin/Unit| {
+    }
+    public sealed interface _main__9545492147483647JVM__1_8_ : R|kotlin/Any| {
+    }
