@@ -88,7 +88,7 @@ fun main() {
 }
 ```
 
-Contrast that with the application wiring module:
+Contrast that with the app module
 
 ```kt
 // Module: mySqlDataSource
