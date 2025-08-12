@@ -26,7 +26,7 @@ The DI framework with the closest UX is currently: [Inject by IVIanuu](https://g
 The core feature of Sink is the injectable.
 An Injectable is uniquely identified by its type.
 That means you cannot qualify nor scope it.
-Instead we use use modern Kotlin features to achieve scoped and qualified behavior.
+Instead, we use modern Kotlin features to achieve scoped and qualified behavior.
 
 You can declare an injectable function or class annotated with `@com.woutwerkman.sink.Injectable`.
 ```kt
@@ -41,7 +41,7 @@ class ServiceImpl: Service
 After this you can inject `Service` in any other Injectable, as long as it's in the same module or a depending module.
 ```kt
 @Injectable
-internal class AppImpl(val service: Service/* This get's autowired by DI framework */): App
+internal class AppImpl(val service: Service/* This gets autowired by DI framework */): App
 
 fun main() {
     val app = InjectionCache().get<App>()
