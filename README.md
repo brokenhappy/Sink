@@ -1,31 +1,52 @@
-# Kotlin Compiler Plugin template
+# Sink, making DI code fabulous again!
 
-This is a template project for writing a compiler plugin for the Kotlin compiler.
+This DI (Dependency Injection) Framework uses Kotlin's modern syntax to improve over Java-based DI UX.
 
-## Details
+## Using Sink
 
-This project has three modules:
-- The [`:compiler-plugin`](compiler-plugin/src) module contains the compiler plugin itself.
-- The [`:plugin-annotations`](plugin-annotations/src/commonMain/kotlin) module contains annotations which can be used in
-user code for interacting with compiler plugin.
-- The [`:gradle-plugin`](gradle-plugin/src) module contains a simple Gradle plugin to add the compiler plugin and
-annotation dependency to a Kotlin project. 
+Sorry, I haven't published any tag yet. If you'd like to try an early version, please let me know :).
 
-Extension point registration:
-- K2 Frontend (FIR) extensions can be registered in `SimplePluginRegistrar`.
-- All other extensions (including K1 frontend and backend) can be registered in `SimplePluginComponentRegistrar`.
+The DI framework with the closest UX is currently: [Inject by IVIanuu](https://github.com/IVIanuu/injekt)
 
-## Tests
+## Core principles
 
-The [Kotlin compiler test framework][test-framework] is set up for this project.
-To create a new test, add a new `.kt` file in a [compiler-plugin/testData](compiler-plugin/testData) sub-directory:
-`testData/box` for codegen tests and `testData/diagnostics` for diagnostics tests.
-The generated JUnit 5 test classes will be updated automatically when tests are next run.
-They can be manually updated with the `generateTests` Gradle task as well.
-To aid in running tests, it is recommended to install the [Kotlin Compiler DevKit][test-plugin] IntelliJ plugin,
-which is pre-configured in this repository.
+ - Don't use the UX of existing DI frameworks as a base
+ - Focus on code that people write when they don't use DI frameworks (but do use DI) and generate their boilerplate.
+ - Least magic principle.
+ - Don't sacrifice on:
+   - Simplicity: Solve as many problems with as few DI features as possible.
+   - Architecture: Respect isolation and promote modularization and decoupling.
+   - Performance: Decisions are made at compile time, and instantiation is lazy by default.
+   - Developer Experience: Catch errors early, actionable errors, and deep integration with the IDE.
 
-[//]: # (Links)
+## Features
 
-[test-framework]: https://github.com/JetBrains/kotlin/blob/2.1.20/compiler/test-infrastructure/ReadMe.md
-[test-plugin]: https://github.com/JetBrains/kotlin-compiler-devkit
+### Core feature
+
+The core feature is a function or class annotated with `@com.woutwerkman.sink.Injectable`.
+```kt
+@Injectable
+fun serviceCreator(): Service = TODO()
+```
+Or:
+```kt
+@Injectable
+class ServiceImpl: Service
+```
+After this you can inject `Service` in any other Injectable, as long as it's in the same module or a depending module.
+```kt
+@Injectable
+internal class AppImpl(val service: Service): App
+
+fun main() {
+    val app = InjectionCache().get<App>()
+}
+```
+Hmm, what this injection cache is, you ask?
+Good question :). First, all `@Injectables` are only singletons.
+And as part of the "least magic principle," Sink will not magically store these instances.
+So this means that `@Injectables` are only singletons in any injection cache.
+
+A lot more to talk about, but so little time! I'll add more soon!
+
+[//]: # (TODO: Add more)
