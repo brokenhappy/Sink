@@ -14,7 +14,7 @@ The DI framework with the closest UX is currently: [Inject by IVIanuu](https://g
  - Focus on code that people write when they don't use DI frameworks (but do use DI) and generate their boilerplate.
  - Least magic principle.
  - Don't sacrifice on:
-   - Simplicity: Solve as many problems with as few DI features as possible.
+   - Simplicity: Solve as many problems with as few DI features as possible, while keeping features focused.
    - Architecture: Respect isolation and promote modularization and decoupling.
    - Performance: Decisions are made at compile time, and instantiation is lazy by default.
    - Developer Experience: Catch errors early, actionable errors, and deep integration with the IDE.
