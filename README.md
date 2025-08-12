@@ -54,12 +54,15 @@ So this means that `@Injectables` are only singletons in any injection cache.
 
 ## External dependencies
 
+<details>
+
 It's common for dependencies to be satisfied inside the module or from dependencies of the module.
 But sometimes a dependency is **intentionally** left to be implemented by depending modules.
 
 In short:
 
-> If your module *must not* decide which implementation to use, then it can be left up to whoever uses it.
+> If your module **must not** decide which injectable to use for a dependency,
+> then it can be left up to whoever uses your module.
 
 This is an important feature for modularization and decoupling.
 
@@ -108,6 +111,7 @@ fun main() {
     val app = InjectionCache().get<App>()
 }
 ```
+</details>
 
 A lot more to talk about, but so little time! I'll add more soon!
 
