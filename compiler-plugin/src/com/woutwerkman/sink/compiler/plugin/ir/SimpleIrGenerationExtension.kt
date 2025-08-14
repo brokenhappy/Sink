@@ -4,7 +4,7 @@ package com.woutwerkman.sink.compiler.plugin.ir
 // TODO: Add support for kx Serializer injection? Might be cool icw generic support
 
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.compiler.common.moduleDependencyGraphFromBytes
+import com.woutwerkman.sink.ide.compiler.common.addFromBytes
 import org.jetbrains.kotlin.backend.common.extensions.IrGeneratedDeclarationsRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -26,17 +26,17 @@ import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrClassSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
+import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
 import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
-import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
@@ -45,9 +45,11 @@ import org.jetbrains.kotlin.resolve.scopes.MemberScope
 
 class SimpleIrGenerationExtension: IrGenerationExtension {
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+        val typeBehavior = IrTypeBehavior(IrTypeSystemContextImpl(pluginContext.irBuiltIns))
         context(
-            IrTypeBehavior(IrTypeSystemContextImpl(pluginContext.irBuiltIns)),
-            functionBehavior,
+            typeBehavior,
+            FunctionBehavior(typeBehavior, pluginContext.messageCollector),
+            DeclarationContainerBehavior,
             pluginContext.metadataDeclarationRegistrar,
             pluginContext,
         ) {
@@ -59,25 +61,22 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         typeBehavior: TypeBehavior,
         _: FunctionBehavior,
         metadataDeclarationRegistrar: IrGeneratedDeclarationsRegistrar,
+        declarationContainerBehavior: DeclarationContainerBehavior,
         pluginContext: IrPluginContext,
     )
     private fun generateInternal(moduleFragment: IrModuleFragment) {
         // TODO: Use explicit-API compiler flag for some things?
         val injectableCacheInterface = pluginContext.referenceClass(ClassId.topLevel(injectionCacheFqn))
             ?: return // Early exit, this module does not include Sink compile time dependency
-        val injectablesDeclaredInThisModule = collectInjectableImplementationsOf(moduleFragment)
-        if (injectablesDeclaredInThisModule.isEmpty()) return
         val injectableCacheType by lazy { injectableCacheInterface.typeWith() }
 
-        val moduleDependencyGraphs = pluginContext.referenceAllModuleDependencyGraphs()
+        val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs()
 
-        val graph = DependencyGraphBuilder().buildGraph(injectablesDeclaredInThisModule, moduleDependencyGraphs)
+        val graph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
+            .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph)
 
         graph.cycles.forEach { cycle ->
             pluginContext.messageCollector.reportErrorsForCycle(cycle)
-        }
-        graph.duplicates.forEach { duplicates ->
-            pluginContext.messageCollector.reportErrorsForDuplicates(duplicates)
         }
 
         val creationSession = InjectionFunctionCreationSession(
@@ -90,15 +89,14 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
 
         data class InjectableAndInjectionFunction(val injectable: IrFunction, val injectionFunction: IrSimpleFunction)
 
-        val injectablesAndTheirInjectionFunctions = graph
-            .instantiatorFunctionsToDependencies
-            .keys
-            .map { injectable ->
-                InjectableAndInjectionFunction(
+        val injectablesAndTheirInjectionFunctions = buildList {
+            graph.forEachInjectable { injectable ->
+                add(InjectableAndInjectionFunction(
                     injectable = injectable.owner,
                     injectionFunction = creationSession.generateInjectionFunction(injectable.owner, graph),
-                )
+                ))
             }
+        }
 
         // Now persist the generated declarations
         injectablesAndTheirInjectionFunctions.forEach { (injectable, injectionFunction) ->
@@ -300,8 +298,9 @@ fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
         takeWhile { it != startElement }
 
 context(_: TypeBehavior, _: FunctionBehavior)
-private fun IrPluginContext.referenceAllModuleDependencyGraphs(): List<ModuleDependencyGraph> =
-    referenceFunctions(metadataFunctionCallableId).mapNotNull { metadataFunction ->
+private fun IrPluginContext.referenceAllModuleDependencyGraphs(): ModuleDependencyGraph {
+    val graph = ModuleDependencyGraph()
+    referenceFunctions(metadataFunctionCallableId).forEach { metadataFunction ->
         metadataFunction
             .owner
             .getAnnotation(metadataAnnotationFqn)
@@ -312,28 +311,14 @@ private fun IrPluginContext.referenceAllModuleDependencyGraphs(): List<ModuleDep
             ?.let { it as? String }
             ?.encodeToByteArray()
             ?.let { metadata ->
-                moduleDependencyGraphFromBytes(
+                graph.addFromBytes(
                     injectorResolver = { referenceFunctions(FqName(it).asCallableId()).single() },
                     bytes = metadata,
                 )
             }
     }
-
-private fun collectInjectableImplementationsOf(moduleFragment: IrModuleFragment): List<IrFunctionSymbol> = buildList {
-    moduleFragment.acceptChildrenVoid(object : IrVisitorVoid() {
-        override fun visitElement(element: IrElement) {
-            element.acceptChildrenVoid(this)
-        }
-
-        override fun visitFunction(declaration: IrFunction) {
-            if (!declaration.declaresInjectable()) return
-            add(declaration.symbol)
-        }
-    })
+    return graph
 }
-
-private fun IrFunction.declaresInjectable(): Boolean = hasAnnotation(injectableAnnotationFqn) ||
-    (this is IrConstructor && this.parentAsClass.hasAnnotation(injectableAnnotationFqn))
 
 private fun ModuleDescriptor.stableOrRegularName(): Name = stableName ?: name
 
@@ -343,7 +328,7 @@ private fun Name.getModuleMetadataFunctionId(): CallableId = CallableId(
     callableName = Name.identifier("sinkMetadata"),
 )
 
-private val injectableAnnotationFqn = FqName("com.woutwerkman.sink.Injectable")
+internal val injectableAnnotationFqn = FqName("com.woutwerkman.sink.Injectable")
 internal val metadataAnnotationFqn = FqName("com.woutwerkman.sink._SinkMetadata")
 private val injectionCacheFqn = FqName("com.woutwerkman.sink.InjectionCache")
 

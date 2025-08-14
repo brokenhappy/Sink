@@ -1,10 +1,7 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources
-import com.woutwerkman.sink.ide.compiler.common.FunctionBehavior
-import com.woutwerkman.sink.ide.compiler.common.ModuleDependencyGraph
-import com.woutwerkman.sink.ide.compiler.common.flatMapLikelySingle
+import com.woutwerkman.sink.ide.compiler.common.ModulesDependencyGraph
 import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -35,19 +32,23 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
 internal typealias ModuleDependencyGraph =
-    ModuleDependencyGraph<IrFunctionSymbol, IrType, IrClassifierSymbol>
-internal typealias DependencyGraph =
-    DependencyGraphFromSources<IrFunctionSymbol, IrType, IrClassifierSymbol>
+    ModulesDependencyGraph<IrFunctionSymbol, IrType, IrClassifierSymbol, DeclarationContainer>
+internal typealias DependencyGraphFromSources =
+    com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources<IrFunctionSymbol, IrType, IrClassifierSymbol, DeclarationContainer>
 internal typealias ResolvedDependency =
-    DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol>
+    DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 internal typealias ExternalDependency =
-    DependencyGraphBuilder.ResolvedDependency.ExternalDependency<IrType, IrFunctionSymbol>
+    DependencyGraphBuilder.ResolvedDependency.ExternalDependency<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 internal typealias ImplementationDetail =
-    DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<IrType, IrFunctionSymbol>
+    DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 internal typealias TypeBehavior =
     com.woutwerkman.sink.ide.compiler.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
-internal typealias FunctionBehavior =
-    FunctionBehavior<IrType, IrFunctionSymbol>
+
+internal sealed class DeclarationContainer {
+    data class ModuleAsContainer(val moduleFragment: IrModuleFragment) : DeclarationContainer()
+    data class FileAsContainer(val file: IrFile) : DeclarationContainer()
+    data class ObjectAsContainer(val objectDeclaration: IrClass) : DeclarationContainer()
+}
 
 internal class InjectionFunctionCreationSession(
     private val pluginContext: IrPluginContext,
@@ -63,12 +64,12 @@ internal class InjectionFunctionCreationSession(
         val declaration: IrSimpleFunction,
     )
 
-    internal fun generateInjectionFunction(instantiator: IrFunction, graph: DependencyGraph): IrSimpleFunction =
-        generateInjectionFunctionInternal(instantiator, graph).declaration!!
+    internal fun generateInjectionFunction(instantiator: IrFunction, graph: DependencyGraphFromSources): IrSimpleFunction =
+        generateInjectionFunctionInternal(instantiator, graph).declaration
 
     private fun generateInjectionFunctionInternal(
         instantiator: IrFunction,
-        graph: DependencyGraph,
+        graph: DependencyGraphFromSources,
     ): InjectionFunction = cache.getOrPut(instantiator) {
         if (!instantiator.isDeclaredIn(moduleFragment)) return@getOrPut InjectionFunction(
             declaration = instantiator as IrSimpleFunction,
@@ -158,7 +159,7 @@ internal class InjectionFunctionCreationSession(
 
     private fun createDependencyProvidingArgument(
         dependency: ResolvedDependency,
-        graph: DependencyGraph,
+        graph: DependencyGraphFromSources,
         factory: IrFactoryWithSameOffsets,
         injectionCacheReceiverParameterCreator: () -> IrGetValue?,
         getParameterValueByType: (IrType) -> IrGetValue,
@@ -407,5 +408,5 @@ internal fun IrSimpleType.typeArgumentsToString(
 
 internal object SinkPluginKey: GeneratedDeclarationKey()
 
-private fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
+private fun DependencyGraphFromSources.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
     instantiatorFunctionsToDependencies[function]?.filterIsInstance<ExternalDependency>() ?: emptyList()

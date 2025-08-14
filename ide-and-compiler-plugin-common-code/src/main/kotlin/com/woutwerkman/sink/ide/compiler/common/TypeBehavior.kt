@@ -9,7 +9,6 @@ data class ConcreteType<TypeSymbol, TypeExpression>(val symbol: TypeSymbol, val 
 enum class DeclarationVisibility {
     Public,
     Internal,
-    Protected,
     Private,
 }
 
