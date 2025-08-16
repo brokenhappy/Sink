@@ -27,7 +27,7 @@ class GraphBuilderTest {
         buildDiGraph {
             // no functions
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.isEmpty())
+            assert(graph.injectables.isEmpty())
             assert(graph.cycles.isEmpty())
         }
     }
@@ -39,7 +39,7 @@ class GraphBuilderTest {
         buildDiGraph {
             public func "foo".returns<Foo>()
         }.also { graph ->
-            graph.instantiatorFunctionsToDependencies.entries.single().also { (func, dependencies) ->
+            graph.injectables.entries.single().also { (func, dependencies) ->
                 assert(func.name == "foo")
                 assert(dependencies.isEmpty())
             }
@@ -214,7 +214,7 @@ class GraphBuilderTest {
             public func "foo".returns<Foo>()
             public func "bar".returns<Bar>()
         }.also { graph ->
-            graph.instantiatorFunctionsToDependencies.values.also { dependencies ->
+            graph.injectables.values.also { dependencies ->
                 dependencies.size.assertIs(2)
                 dependencies.flatten().assert { it.isEmpty() }
             }
@@ -249,7 +249,7 @@ class GraphBuilderTest {
             public func "foo".returns<Foo>()
             public func "bar"("foo"<Foo>()).returns<Bar>()
         }.also { graph ->
-            assert(graph.instantiatorFunctionsToDependencies.size == 2)
+            assert(graph.injectables.size == 2)
             graph
                 .dependenciesForFunctionCalled("bar")
                 .single()
@@ -269,7 +269,7 @@ class GraphBuilderTest {
             public func "foo"("bar"<Bar>()).returns<Foo>()
             public func "bar"("foo"<Foo>()).returns<Bar>()
         }.also { graph ->
-            graph.instantiatorFunctionsToDependencies.size.assertIs(2)
+            graph.injectables.size.assertIs(2)
             graph
                 .cycles
                 .single()
@@ -289,7 +289,7 @@ class GraphBuilderTest {
             public func "bar".returns<Bar>()
             public func "baz"("foo"<Foo>()).returns<Baz>()
         }.also { graph ->
-            graph.instantiatorFunctionsToDependencies.size.assertIs(2)
+            graph.injectables.size.assertIs(2)
             graph
                 .dependenciesForFunctionCalled("baz")
                 .single()
@@ -431,7 +431,7 @@ class GraphBuilderTest {
             public func "b"("a"<A>()).returns<B>()
             public func "c"("b"<B>()).returns<C>()
         }.also { graph ->
-            graph.instantiatorFunctionsToDependencies.size.assertIs(3)
+            graph.injectables.size.assertIs(3)
             graph
                 .cycles
                 .single()
@@ -550,13 +550,13 @@ private fun DependencyGraphFromSources.dependenciesForFunctionCalled(
 ): List<DependencyGraphBuilder.ResolvedDependency<KType, FunctionSymbol, KClass<*>, DeclarationContainer>> =
     dependenciesForFunctionCalledOrNull(name)
         .let { it ?: children.firstNotNullOfOrNull { it.dependenciesForFunctionCalledOrNull(name) } }
-        .assertNotNull { "No function with name $name found among ${instantiatorFunctionsToDependencies.keys.map { it.name }}" }
+        .assertNotNull { "No function with name $name found among ${injectables.keys.map { it.name }}" }
         .value
 
 private fun DependencyGraphFromSources.dependenciesForFunctionCalledOrNull(
     name: String
 ): Map.Entry<FunctionSymbol, List<DependencyGraphBuilder.ResolvedDependency<KType, FunctionSymbol, KClass<*>, DeclarationContainer>>>? =
-    instantiatorFunctionsToDependencies
+    injectables
         .entries
         .firstOrNull { it.key.name == name }
 
@@ -630,7 +630,7 @@ private fun buildInjectableContainer(visibility: DeclarationVisibility, builder:
 
 private fun DependencyGraphFromSources.toModuleGraph(): ModuleDependencyGraph {
     val resolverMap = buildMap {
-        forEachInjectable { original ->
+        forEachInjectable { _, original ->
             val fqn = KTypeBehavior.injectorFunctionNameOf(original.returnType)
             this[fqn] = FunctionSymbol(
                 visibility = DeclarationVisibility.Public,
@@ -692,5 +692,5 @@ object KTypeBehavior: TypeBehavior<KType, KClass<*>, KTypeParameter> {
 private object DeclarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol> {
     override fun getChildrenOf(container: DeclarationContainer): List<DeclarationContainer> = container.childContainers
     override fun getDeclarationsOf(container: DeclarationContainer): List<FunctionSymbol> = container.injectables
-    override fun getVisibilityOf(container: DeclarationContainer): DeclarationVisibility = container.visibility
+    override fun getVisibilityToParentOf(container: DeclarationContainer): DeclarationVisibility = container.visibility
 }

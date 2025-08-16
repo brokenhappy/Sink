@@ -14,16 +14,21 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import com.woutwerkman.sink.compiler.plugin.metadataFunctionCallableId
 import com.woutwerkman.sink.compiler.plugin.somewhatIdentifyingName
+import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
+import com.woutwerkman.sink.ide.compiler.common.mapLikely0Or1
+import com.woutwerkman.sink.ide.compiler.common.mapNotNullLikely0Or1
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
-import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -72,10 +77,10 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
 
         val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs()
 
-        val graph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
+        val topLevelGraph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
             .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph)
 
-        graph.cycles.forEach { cycle ->
+        topLevelGraph.cycles.forEach { cycle ->
             pluginContext.messageCollector.reportErrorsForCycle(cycle)
         }
 
@@ -90,10 +95,10 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         data class InjectableAndInjectionFunction(val injectable: IrFunction, val injectionFunction: IrSimpleFunction)
 
         val injectablesAndTheirInjectionFunctions = buildList {
-            graph.forEachInjectable { injectable ->
+            topLevelGraph.forEachInjectable { injectableHostGraph, injectable ->
                 add(InjectableAndInjectionFunction(
                     injectable = injectable.owner,
-                    injectionFunction = creationSession.generateInjectionFunction(injectable.owner, graph),
+                    injectionFunction = creationSession.generateInjectionFunction(injectable.owner, injectableHostGraph),
                 ))
             }
         }
@@ -102,6 +107,89 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         injectablesAndTheirInjectionFunctions.forEach { (injectable, injectionFunction) ->
             injectable.file.addChild(injectionFunction)
             metadataDeclarationRegistrar.registerFunctionAsMetadataVisible(injectionFunction)
+        }
+
+        topLevelGraph.transformAllGetCalls(moduleFragment, pluginContext, injectableCacheType) { getCall, graph, file ->
+            val start = getCall.startOffset
+            val end = getCall.endOffset
+            val factory = IrFactoryWithSameOffsets(pluginContext.irFactory, pluginContext, start, end)
+
+            val requestedType = getCall.typeArguments.single()!!
+
+            val (_, hostGraph, chosen) = graph.findCandidatesForType(requestedType).single() // TODO: Handle
+            val injectionFunction = creationSession.generateInjectionFunction(chosen.owner, hostGraph)
+
+            val requiredParams: List<IrType> = hostGraph
+                .allExternalDependenciesOf(chosen)
+                .mapLikely0Or1 { it.type }
+
+            fun IrType.isSubtype(supertype: IrType): Boolean = typeBehavior.isSubtype(this, supertype)
+            val arguments = getCall
+                .arguments
+                .getOrNull(1)
+                ?.let { it as? IrVararg }
+                ?.elements
+                .let { it ?: emptyList() }
+                .map { varargElement ->
+                    when (varargElement) {
+                        is IrSpreadElement -> {
+                            pluginContext.messageCollector.report(
+                                CompilerMessageSeverity.ERROR,
+                                "Cannot use spread operator when passing arguments to InjectionCache.get",
+                                varargElement.getCompilerMessageLocation(file),
+                            )
+                            return@transformAllGetCalls getCall
+                        }
+                        !is IrExpression -> {
+                            pluginContext.messageCollector.report(
+                                CompilerMessageSeverity.ERROR,
+                                "This is an unexpected argument to `.get`. Please report a bug an include this argument",
+                                varargElement.getCompilerMessageLocation(file),
+                            )
+                            return@transformAllGetCalls getCall
+                        }
+                        else -> varargElement
+                    }
+                }
+                .also { arguments ->
+                    requiredParams.forEachIndexed { i, requiredParam ->
+                        val argument = arguments.getOrNull(i) ?: run {
+                            pluginContext.messageCollector.report(
+                                CompilerMessageSeverity.ERROR,
+                                "Missing argument $i, which is an external dependency of ${requestedType.render()}",
+                                getCall.getCompilerMessageLocation(file),
+                            )
+                            return@transformAllGetCalls getCall
+                        }
+                        if (!argument.type.isSubtype(requiredParam)) {
+                            pluginContext.messageCollector.report(
+                                CompilerMessageSeverity.ERROR,
+                                "Attempted to pass argument of type ${argument.type.render()}, but expected ${requiredParam.render()}",
+                                argument.getCompilerMessageLocation(file),
+                            )
+                            return@transformAllGetCalls getCall
+                        }
+                    }
+                    if (arguments.size > requiredParams.size) {
+                        arguments.drop(requiredParams.size).forEach { argument ->
+                            pluginContext.messageCollector.report(
+                                CompilerMessageSeverity.ERROR,
+                                "Too many arguments passed for ${requestedType.render()}",
+                                argument.getCompilerMessageLocation(file),
+                            )
+                        }
+                        return@transformAllGetCalls getCall
+                    }
+                }
+
+            // Build call to the generated injection function
+            factory.createCallExpression(
+                type = requestedType,
+                symbol = injectionFunction.symbol,
+                extensionReceiver = getCall.arguments.firstOrNull(),
+                arguments = arguments,
+                typeArguments = emptyList(),
+            )
         }
 
         val callableId = moduleFragment.descriptor.stableOrRegularName().getModuleMetadataFunctionId()
@@ -214,7 +302,7 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
                                     startOffset = SYNTHETIC_OFFSET,
                                     endOffset = SYNTHETIC_OFFSET,
                                     type = pluginContext.irBuiltIns.stringType,
-                                    value = graph.serializeAsModuleDependencyGraph().decodeToString(),
+                                    value = topLevelGraph.serializeAsModuleDependencyGraph().decodeToString(),
                                 )
                             },
                         ),

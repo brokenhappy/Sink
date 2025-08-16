@@ -23,7 +23,11 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             override val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?,
             val graphWhereFunctionIsHosted: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             val graphWhereFunctionOriginated: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-        ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
+        ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
+            init {
+                val a = 1
+            }
+        }
         data class ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
             val type: TypeExpression,
@@ -49,7 +53,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             }
 
             hydrateDependenciesAndTryToResolveLocallyRecursive(graph)
-            graph.cycles = graph.instantiatorFunctionsToDependencies.findCycles()
+            graph.cycles = graph.injectables.findCycles()
         }
 
     context(
@@ -64,7 +68,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
         fun DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.addFunction(
             instantiatorWithGraph: FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>,
         ) {
-            instantiatorFunctionsToDependencies[instantiatorWithGraph.value] = listOf()
+            injectables[instantiatorWithGraph.value] = listOf()
             superTypesMap.addSupertypes(instantiatorWithGraph, instantiatorWithGraph.value.returnType)
         }
 
@@ -73,18 +77,23 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             instantiatorWithGraph: FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>,
         ) {
             val parent = this.parent
-            if (originatingContainerVisibility == DeclarationVisibility.Private || parent !is DependencyGraphFromSourcesImpl) {
+            val currentVisibility = declarationContainerBehavior.getVisibilityToParentOf(instantiatorWithGraph.graph.container)
+            if (
+                originatingContainerVisibility == DeclarationVisibility.Private ||
+                currentVisibility == null || // TODO: Test this
+                parent !is DependencyGraphFromSourcesImpl
+            ) {
                 this.addFunction(instantiatorWithGraph)
             } else {
                 parent.pushInjectableUpUntilMaximumVisibility(
-                    originatingContainerVisibility = declarationContainerBehavior.getVisibilityOf(instantiatorWithGraph.graph.container),
+                    originatingContainerVisibility = currentVisibility,
                     instantiatorWithGraph
                 )
             }
         }
 
         return DependencyGraphFromSourcesImpl(
-            instantiatorFunctionsToDependencies = mutableMapOf(),
+            injectables = mutableMapOf(),
             superTypesMap = mutableMapOf(),
             container = container,
             parent = parentGraph,
@@ -217,7 +226,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                             transitiveDependencies = recurse(matchOriginGraph, matchHostGraph, match)
                                 .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() },
                             graphWhereThisWasResolved = null,
-                            graphWhereFunctionIsHosted = matchOriginGraph,
+                            graphWhereFunctionIsHosted = matchHostGraph,
                             graphWhereFunctionOriginated = matchOriginGraph,
                         )
                     }
@@ -331,6 +340,7 @@ sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, Dec
 //            ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>,
 //        >>
 //    >
+    val injectables: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
     fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>>
 }
@@ -340,8 +350,7 @@ interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol,
     val container: DeclarationContainer
     val cycles: List<List<FunctionSymbol>>
     val parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
-    val instantiatorFunctionsToDependencies: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
-    fun forEachInjectable(onInjectable: (FunctionSymbol) -> Unit)
+    fun forEachInjectable(onInjectable: (hostingGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol) -> Unit)
     val children: List<DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
     context(
         _: FunctionBehavior<TypeExpression, FunctionSymbol>,
@@ -352,7 +361,7 @@ interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol,
 }
 
 internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(
-    override val instantiatorFunctionsToDependencies: MutableMap<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>,
+    override val injectables: MutableMap<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>,
     override val superTypesMap: MutableMap<TypeSymbol, MutableList<FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>,
     override var container: DeclarationContainer,
     override var cycles: List<List<FunctionSymbol>> = emptyList(),
@@ -360,8 +369,12 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 ) : DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
     override lateinit var children: List<DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
 
-    override fun forEachInjectable(onInjectable: (FunctionSymbol) -> Unit) {
-        instantiatorFunctionsToDependencies.keys.forEach(onInjectable)
+    override fun forEachInjectable(
+        onInjectable: (hostingGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol) -> Unit,
+    ) {
+        injectables.keys.forEach {
+            onInjectable(this, it)
+        }
         children.forEach { it.forEachInjectable(onInjectable) }
     }
 
@@ -406,7 +419,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
                             require(hostGraph is DependencyGraphFromSourcesImpl)
                             require(originalGraph is DependencyGraphFromSourcesImpl)
                             mapper(originalGraph, hostGraph, function).also {
-                                hostGraph.instantiatorFunctionsToDependencies[function] = it
+                                hostGraph.injectables[function] = it
                             }
                         }
                     }
@@ -460,7 +473,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
     private fun MutableList<FunctionSymbol>.addAllRecursiveDeclarationsOf(
         container: DeclarationContainer,
     ) {
-        if (declarationContainerBehavior.getVisibilityOf(container) != DeclarationVisibility.Public) return
+        if (declarationContainerBehavior.getVisibilityToParentOf(container) != DeclarationVisibility.Public) return
         declarationContainerBehavior.getDeclarationsOf(container).forEach { declaration ->
             if (functionBehavior.getVisibilityOf(declaration) == DeclarationVisibility.Public) add(declaration)
         }
@@ -481,7 +494,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDe
         val fqnSize = bytes.readIntAt(currentOffset).also { currentOffset += 4 }
         val fqn = bytes.decodeToString(currentOffset, currentOffset + fqnSize).also { currentOffset += fqnSize }
         val injector = injectorResolver(fqn)
-        injectables[injector] = injector.parameters.map { (name, type) ->
+        injectables[injector] = injector.parameters.drop(1).map { (name, type) ->
             ExternalDependency(name, type, this)
         }
         supertypesMap.addSupertypes(injector, injector.returnType)
@@ -490,7 +503,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDe
 
 class ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(): DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
     val supertypesMap: MutableMap<TypeSymbol, MutableList<FunctionSymbol>> = mutableMapOf()
-    val injectables: MutableMap<FunctionSymbol, List<ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>> = mutableMapOf()
+    override val injectables: MutableMap<FunctionSymbol, List<ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>> = mutableMapOf()
 
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
     override fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>> =
@@ -557,11 +570,12 @@ private fun <T> List<T>.plusLikelyEmpty(other: List<T>): List<T> = when {
 interface DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol> {
     fun getChildrenOf(container: DeclarationContainer): List<DeclarationContainer>
     fun getDeclarationsOf(container: DeclarationContainer): List<FunctionSymbol>
-    fun getVisibilityOf(container: DeclarationContainer): DeclarationVisibility
+    /** Null means that it's not visible to the parent at all, so more restrictive than private */
+    fun getVisibilityToParentOf(container: DeclarationContainer): DeclarationVisibility?
 }
 
 /** Semantically just [flatMap] But reduces allocations on the happy path, which is likely just a single item */
-public inline fun <T, R> List<T>.flatMapLikelySingle(mapper: (T) -> List<R>): List<R> {
+public inline fun <T, R> List<T>.flatMapLikely0Or1(mapper: (T) -> List<R>): List<R> {
     var resultSingle: List<R>? = null
     var resultMultiple: MutableList<R>? = null
     for (element in this) {
@@ -609,7 +623,7 @@ private fun <
         if (behavior.isSubtype(injectable.returnType, type)) FunctionWithGraphs(originalGraph, hostingGraph, injectable) else null
     }
 
-private inline fun <T, R> Collection<T>.mapLikely0Or1(mapper: (T) -> R): List<R> = when (size) {
+public inline fun <T, R> Collection<T>.mapLikely0Or1(mapper: (T) -> R): List<R> = when (size) {
     0 -> emptyList()
     1 -> listOf(mapper(first()))
     else -> mapTo(ArrayList(size), mapper)

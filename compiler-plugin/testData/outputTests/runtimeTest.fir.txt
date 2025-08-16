@@ -1,23 +1,167 @@
-FILE: runtimeTest.kt
+Module: sink
+FILE: sink.kt
+    package com.woutwerkman.sink
+
+    @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Injectable : R|kotlin/Annotation| {
+        public constructor(): R|com/woutwerkman/sink/Injectable| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public abstract interface InjectionCache : R|kotlin/Any| {
+        public abstract fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T|
+
+    }
+    public final inline fun <reified T> R|com/woutwerkman/sink/InjectionCache|.get(vararg args: R|kotlin/Array<out kotlin/Any?>|): R|T| {
+        ^get R|kotlin/error|(String(If you're seeing this error, it means you accidentally forgot to compile this module with the Sink compiler plugin.))
+    }
+    public final fun InjectionCache(): R|com/woutwerkman/sink/InjectionCache| {
+        ^InjectionCache object : R|com/woutwerkman/sink/InjectionCache| {
+            private constructor(): R|com/woutwerkman/sink/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            private final val cache: R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>| = R|kotlin/collections/mutableMapOf|<R|kotlin/Any?|, R|kotlin/Any?|>()
+                private get(): R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>|
+
+            public open override fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T| {
+                ^computeIfAbsent (this@R|com/woutwerkman/sink/<anonymous>|.R|com/woutwerkman/sink/<anonymous>.cache|.R|kotlin/collections/getOrPut|<R|kotlin/Any?|, R|kotlin/Any?|>(R|<local>/key|, R|<local>/compute|) as R|T|)
+            }
+
+        }
+
+    }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_sink__9545492147483647JVM__1_8_|): R|kotlin/Unit| {
+    }
+    public sealed interface _sink__9545492147483647JVM__1_8_ : R|kotlin/Any| {
+    }
+Module: modulea
+FILE: fooAndBar.kt
+    package modulea
+
     public abstract interface Foo : R|kotlin/Any| {
+        public abstract fun getCharA(): R|kotlin/Char|
+
+    }
+    public abstract interface Bar : R|kotlin/Any| {
+        public abstract fun combine(lhs: R|kotlin/Char|, rhs: R|kotlin/Char|): R|kotlin/String|
+
+    }
+    public abstract interface Baz : R|kotlin/Any| {
+        public abstract fun combine(lhs: R|kotlin/Char|, rhs: R|kotlin/Char|): R|kotlin/String|
+
+    }
+    public abstract interface Buz : R|kotlin/Any| {
+    }
+    @R|com/woutwerkman/sink/Injectable|() public final fun foo(): R|modulea/Foo| {
+        ^foo object : R|modulea/Foo| {
+            private constructor(): R|modulea/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun getCharA(): R|kotlin/Char| {
+                ^getCharA Char(o)
+            }
+
+        }
+
+    }
+    @R|com/woutwerkman/sink/Injectable|() public final fun bar(foo: R|modulea/Foo|, baz: R|modulea/Baz|, buz: R|modulea/Buz|): R|modulea/Bar| {
+        ^bar object : R|modulea/Bar| {
+            private constructor(): R|modulea/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun combine(lhs: R|kotlin/Char|, rhs: R|kotlin/Char|): R|kotlin/String| {
+                ^combine R|<local>/baz|.R|modulea/Baz.combine|(R|<local>/lhs|, R|<local>/rhs|)
+            }
+
+        }
+
+    }
+FILE: __GENERATED DECLARATIONS__.kt
+    package __sink_metadata__
+
+    public final fun _sinkMetadata_(a: R|__sink_metadata__/_modulea__9545492147483647JVM__1_8_|): R|kotlin/Unit| {
+    }
+    public sealed interface _modulea__9545492147483647JVM__1_8_ : R|kotlin/Any| {
+    }
+Module: main
+FILE: bazFoobsAndBarbs.kt
+    package moduleb
+
+    public abstract interface Foobs : R|kotlin/Any| {
+        public abstract fun getCharA(): R|kotlin/Char|
+
+    }
+    public abstract interface Barbs : R|kotlin/Any| {
         public abstract fun getText(): R|kotlin/String|
 
     }
-    @<ERROR TYPE REF: Symbol not found for Injectable>() private final fun foo(): R|Foo| {
-        ^foo object : R|Foo| {
-            private constructor(): R|<anonymous>| {
+    public abstract interface Bazbs : R|kotlin/Any| {
+        public abstract fun getCharB(): R|kotlin/Char|
+
+    }
+    @R|com/woutwerkman/sink/Injectable|() public final fun baz(foo: R|modulea/Foo|, bazbs: R|moduleb/Bazbs|): R|modulea/Baz| {
+        ^baz object : R|modulea/Baz| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun combine(lhs: R|kotlin/Char|, rhs: R|kotlin/Char|): R|kotlin/String| {
+                ^combine <strcat>(R|<local>/lhs|, R|<local>/rhs|)
+            }
+
+        }
+
+    }
+    @R|com/woutwerkman/sink/Injectable|() public final fun foobs(foo: R|modulea/Foo|): R|moduleb/Foobs| {
+        ^foobs object : R|moduleb/Foobs| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun getCharA(): R|kotlin/Char| {
+                ^getCharA R|<local>/foo|.R|modulea/Foo.getCharA|().R|kotlin/text/uppercaseChar|()
+            }
+
+        }
+
+    }
+    @R|com/woutwerkman/sink/Injectable|() public final fun barbs(bar: R|modulea/Bar|, foobs: R|moduleb/Foobs|, bazbs: R|moduleb/Bazbs|): R|moduleb/Barbs| {
+        ^barbs object : R|moduleb/Barbs| {
+            private constructor(): R|moduleb/<anonymous>| {
                 super<R|kotlin/Any|>()
             }
 
             public open override fun getText(): R|kotlin/String| {
-                ^getText String(OK)
+                ^getText R|<local>/bar|.R|modulea/Bar.combine|(R|<local>/foobs|.R|moduleb/Foobs.getCharA|(), R|<local>/bazbs|.R|moduleb/Bazbs.getCharB|())
             }
 
         }
 
     }
     public final fun box(): R|kotlin/String| {
-        ^box <Unresolved name: InjectionCache>#().<Unresolved name: Foo>#().<Unresolved name: getText>#()
+        ^box R|com/woutwerkman/sink/InjectionCache|().R|com/woutwerkman/sink/get|<R|moduleb/Barbs|>(vararg(object : R|moduleb/Bazbs| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+            public open override fun getCharB(): R|kotlin/Char| {
+                ^getCharB Char(K)
+            }
+
+        }
+        , object : R|modulea/Buz| {
+            private constructor(): R|moduleb/<anonymous>| {
+                super<R|kotlin/Any|>()
+            }
+
+        }
+        )).R|moduleb/Barbs.getText|()
     }
 FILE: __GENERATED DECLARATIONS__.kt
     package __sink_metadata__

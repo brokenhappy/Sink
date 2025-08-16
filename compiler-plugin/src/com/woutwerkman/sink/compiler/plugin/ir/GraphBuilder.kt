@@ -1,9 +1,13 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
+import com.woutwerkman.sink.compiler.plugin.ir.DeclarationContainer.FileAsContainer
+import com.woutwerkman.sink.compiler.plugin.ir.DeclarationContainer.ModuleAsContainer
+import com.woutwerkman.sink.compiler.plugin.ir.DeclarationContainer.ObjectAsContainer
 import com.woutwerkman.sink.ide.compiler.common.ConcreteType
 import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
 import com.woutwerkman.sink.ide.compiler.common.TypeVariance
 import com.woutwerkman.sink.ide.compiler.common.WithVariance
+import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -12,6 +16,7 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithVisibility
 import com.woutwerkman.sink.ide.compiler.common.mapNotNullLikely0Or1
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationContainer
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -24,6 +29,7 @@ import org.jetbrains.kotlin.ir.types.typeOrNull
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.getAnnotation
 import org.jetbrains.kotlin.ir.util.hasAnnotation
+import org.jetbrains.kotlin.ir.util.isObject
 import org.jetbrains.kotlin.ir.util.isSubtypeOf
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.superTypes
@@ -64,23 +70,37 @@ internal class FunctionBehavior(
 
 internal object DeclarationContainerBehavior: com.woutwerkman.sink.ide.compiler.common.DeclarationContainerBehavior<DeclarationContainer, IrFunctionSymbol> {
     override fun getChildrenOf(container: DeclarationContainer): List<DeclarationContainer> {
-        when (container) {
-            is DeclarationContainer.FileAsContainer -> TODO()
-            is DeclarationContainer.ModuleAsContainer -> TODO()
-            is DeclarationContainer.ObjectAsContainer -> TODO()
+        fun IrDeclarationContainer.childObjects(visibilityFromParent: DeclarationVisibility): List<ObjectAsContainer> =
+            declarations.flatMapLikely0Or1 { declaration -> // TODO: Test this!
+                when {
+                    declaration !is IrClass -> emptyList()
+                    declaration.isObject -> listOf(ObjectAsContainer(
+                        objectDeclaration = declaration,
+                        visibilityToParentContainer = when (visibilityFromParent) {
+                            DeclarationVisibility.Private -> null
+                            else -> declaration.visibility.toSinkVisibility().coerceAtLeast(visibilityFromParent)
+                        }
+                    ))
+                    else -> declaration.childObjects(declaration.visibility.toSinkVisibility().coerceAtLeast(visibilityFromParent))
+                }
+            }
+        return when (container) {
+            is FileAsContainer -> container.file.childObjects(DeclarationVisibility.Public)
+            is ModuleAsContainer -> container.moduleFragment.files.map(::FileAsContainer)
+            is ObjectAsContainer -> container.objectDeclaration.childObjects(DeclarationVisibility.Public)
         }
     }
 
     override fun getDeclarationsOf(container: DeclarationContainer): List<IrFunctionSymbol> = when (container) {
-        is DeclarationContainer.FileAsContainer -> container.file.declarations
-        is DeclarationContainer.ModuleAsContainer -> emptyList()
-        is DeclarationContainer.ObjectAsContainer -> container.objectDeclaration.declarations
+        is FileAsContainer -> container.file.declarations
+        is ModuleAsContainer -> emptyList()
+        is ObjectAsContainer -> container.objectDeclaration.declarations
     }.mapNotNullLikely0Or1 { (it as? IrFunction)?.takeIf { it.declaresInjectable() }?.symbol }
 
-    override fun getVisibilityOf(container: DeclarationContainer): DeclarationVisibility = when (container) {
-        is DeclarationContainer.FileAsContainer -> DeclarationVisibility.Public
-        is DeclarationContainer.ModuleAsContainer -> DeclarationVisibility.Public
-        is DeclarationContainer.ObjectAsContainer -> container.objectDeclaration.visibility.toSinkVisibility()
+    override fun getVisibilityToParentOf(container: DeclarationContainer): DeclarationVisibility? = when (container) {
+        is FileAsContainer -> DeclarationVisibility.Public
+        is ModuleAsContainer -> DeclarationVisibility.Public
+        is ObjectAsContainer -> container.visibilityToParentContainer
     }
 
     private fun IrFunction.declaresInjectable(): Boolean = hasAnnotation(injectableAnnotationFqn) ||
@@ -98,7 +118,7 @@ internal class IrTypeBehavior(val typeSystemContext: IrTypeSystemContext) : Type
     /** Null means visibility is unknown */
     private fun getMinimumDescriptorVisibilityOf(expression: IrType): DescriptorVisibility? {
         val (classifier, arguments) = asConcreteType(expression) ?: return DescriptorVisibilities.PUBLIC
-        val visibility = (classifier as? IrDeclarationWithVisibility)?.visibility ?: return null
+        val visibility = (classifier.owner as? IrDeclarationWithVisibility)?.visibility ?: return null
         return arguments.fold(visibility) { acc, it ->
             getMinimumDescriptorVisibilityOf(it)?.coerceAtLeast(acc) ?: return null
         }

@@ -1,7 +1,9 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
+import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
 import com.woutwerkman.sink.ide.compiler.common.ModulesDependencyGraph
+import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
 import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -35,6 +37,8 @@ internal typealias ModuleDependencyGraph =
     ModulesDependencyGraph<IrFunctionSymbol, IrType, IrClassifierSymbol, DeclarationContainer>
 internal typealias DependencyGraphFromSources =
     com.woutwerkman.sink.ide.compiler.common.DependencyGraphFromSources<IrFunctionSymbol, IrType, IrClassifierSymbol, DeclarationContainer>
+internal typealias DependencyGraph =
+    com.woutwerkman.sink.ide.compiler.common.DependencyGraph<IrFunctionSymbol, IrType, IrClassifierSymbol, DeclarationContainer>
 internal typealias ResolvedDependency =
     DependencyGraphBuilder.ResolvedDependency<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 internal typealias ExternalDependency =
@@ -47,7 +51,10 @@ internal typealias TypeBehavior =
 internal sealed class DeclarationContainer {
     data class ModuleAsContainer(val moduleFragment: IrModuleFragment) : DeclarationContainer()
     data class FileAsContainer(val file: IrFile) : DeclarationContainer()
-    data class ObjectAsContainer(val objectDeclaration: IrClass) : DeclarationContainer()
+    data class ObjectAsContainer(
+        val objectDeclaration: IrClass,
+        val visibilityToParentContainer: DeclarationVisibility?,
+    ) : DeclarationContainer()
 }
 
 internal class InjectionFunctionCreationSession(
@@ -64,12 +71,14 @@ internal class InjectionFunctionCreationSession(
         val declaration: IrSimpleFunction,
     )
 
-    internal fun generateInjectionFunction(instantiator: IrFunction, graph: DependencyGraphFromSources): IrSimpleFunction =
-        generateInjectionFunctionInternal(instantiator, graph).declaration
+    context(typeBehavior: TypeBehavior)
+    internal fun generateInjectionFunction(instantiator: IrFunction, hostGraph: DependencyGraph): IrSimpleFunction =
+        generateInjectionFunctionInternal(instantiator, hostGraph).declaration
 
+    context(typeBehavior: TypeBehavior)
     private fun generateInjectionFunctionInternal(
         instantiator: IrFunction,
-        graph: DependencyGraphFromSources,
+        hostGraph: DependencyGraph,
     ): InjectionFunction = cache.getOrPut(instantiator) {
         if (!instantiator.isDeclaredIn(moduleFragment)) return@getOrPut InjectionFunction(
             declaration = instantiator as IrSimpleFunction,
@@ -84,6 +93,23 @@ internal class InjectionFunctionCreationSession(
         )
         val symbol = IrSimpleFunctionSymbolImpl()
 
+        val TODO_INLINE = hostGraph.allExternalDependenciesOf(instantiator.symbol).map { dependency ->
+            pluginContext.irFactory.createValueParameter(
+                /** Represents: [_DocRefExternalDependencyParameter] */
+                startOffset = instantiator.startOffset,
+                endOffset = instantiator.endOffset,
+                origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
+                name = Name.identifier(dependency.parameterName),
+                type = dependency.type,
+                symbol = IrValueParameterSymbolImpl(),
+                isAssignable = false,
+                varargElementType = null,
+                isCrossinline = false,
+                isNoinline = false,
+                isHidden = false,
+                kind = IrParameterKind.Regular,
+            )
+        }
         InjectionFunction(
             functionSymbol = symbol,
             declaration = factory.createSimpleExpressionBodyFunction( /** Represents: [_DocRefFunctionDeclaration] */
@@ -98,23 +124,7 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = graph
-                    .allExternalDependenciesOf(instantiator.symbol).map { dependency ->
-                    pluginContext.irFactory.createValueParameter(/** Represents: [_DocRefExternalDependencyParameter] */
-                        startOffset = instantiator.startOffset,
-                        endOffset = instantiator.endOffset,
-                        origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
-                        name = Name.identifier(dependency.parameterName),
-                        type = dependency.type,
-                        symbol = IrValueParameterSymbolImpl(),
-                        isAssignable = false,
-                        varargElementType = null,
-                        isCrossinline = false,
-                        isNoinline = false,
-                        isHidden = false,
-                        kind = IrParameterKind.Regular,
-                    )
-                },
+                parameters = TODO_INLINE,
                 expressionCreator = { injectionCacheReceiverParameterCreator, functionDeclaration ->
                     factory.createCallExpression( /** Represents: [_DocRefComputeIfAbsent] */
                         type = instantiator.returnType,
@@ -129,24 +139,22 @@ internal class InjectionFunctionCreationSession(
                                 expression = factory.createCallExpression( /** Represents: [_DocRefInstantiatorCall] */
                                     type = instantiator.returnType,
                                     symbol = instantiator.symbol as IrSimpleFunctionSymbol,
-                                    arguments = graph.instantiatorFunctionsToDependencies[instantiator.symbol]!!
-                                        .map { dependency ->
-                                            createDependencyProvidingArgument(
-                                                dependency,
-                                                graph,
-                                                factory,
-                                                injectionCacheReceiverParameterCreator,
-                                                getParameterValueByType = { type ->
-                                                    IrGetValueImpl(
-                                                        startOffset = instantiator.startOffset,
-                                                        endOffset = instantiator.endOffset,
-                                                        type = type,
-                                                        symbol = functionDeclaration.parameters.first { it.type == type }.symbol,
-                                                        origin = GeneratedBySink,
-                                                    )
-                                                }
-                                            )
-                                        },
+                                    arguments = hostGraph.injectables[instantiator.symbol]!!.map { dependency ->
+                                        createDependencyProvidingArgument(
+                                            dependency,
+                                            factory,
+                                            injectionCacheReceiverParameterCreator,
+                                            getParameterValueByType = { type ->
+                                                IrGetValueImpl(
+                                                    startOffset = instantiator.startOffset,
+                                                    endOffset = instantiator.endOffset,
+                                                    type = type,
+                                                    symbol = functionDeclaration.parameters.first { typeBehavior.isSubtype(it.type, type) }.symbol,
+                                                    origin = GeneratedBySink,
+                                                )
+                                            }
+                                        )
+                                    },
                                 ),
                             ),
                         ),
@@ -157,9 +165,9 @@ internal class InjectionFunctionCreationSession(
         )
     }
 
+    context(typeBehavior: TypeBehavior)
     private fun createDependencyProvidingArgument(
         dependency: ResolvedDependency,
-        graph: DependencyGraphFromSources,
         factory: IrFactoryWithSameOffsets,
         injectionCacheReceiverParameterCreator: () -> IrGetValue?,
         getParameterValueByType: (IrType) -> IrGetValue,
@@ -171,21 +179,19 @@ internal class InjectionFunctionCreationSession(
                 type = dependency.instantiatorOrInjectorFunction.owner.returnType,
                 symbol = generateInjectionFunctionInternal(
                     dependency.instantiatorOrInjectorFunction.owner,
-                    graph,
+                    dependency.graphWhereFunctionIsHosted,
                 ).functionSymbol,
                 extensionReceiver = injectionCacheReceiverParameterCreator(), /** Represents: [_DocRefThisValue] */
-                arguments = graph
-                    .allExternalDependenciesOf(dependency.instantiatorOrInjectorFunction)
+                arguments = dependency
+                    .transitiveDependencies
                     .map { subDependency ->
                         createDependencyProvidingArgument(
                             subDependency,
-                            graph,
                             factory,
                             injectionCacheReceiverParameterCreator,
                             getParameterValueByType,
                         )
                     }
-                    // TODO: Support generics
             )
     }
 }
@@ -408,5 +414,25 @@ internal fun IrSimpleType.typeArgumentsToString(
 
 internal object SinkPluginKey: GeneratedDeclarationKey()
 
-private fun DependencyGraphFromSources.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
-    instantiatorFunctionsToDependencies[function]?.filterIsInstance<ExternalDependency>() ?: emptyList()
+context(typeBehavior: TypeBehavior)
+internal fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
+    this.injectables[function]!!.allExternalDependencies().let { dependencies ->
+        val newDependencies = dependencies.toMutableList()
+        var i = 0
+        while (i < newDependencies.size) {
+            val dependency = newDependencies[i]
+            if(newDependencies.withIndex().any { (j, other) ->
+                i != j && typeBehavior.isSubtype(other.type, dependency.type)
+            }) newDependencies.removeAt(i)
+            i++
+        }
+        newDependencies.sortBy { it.parameterName }
+        newDependencies
+    }
+
+private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMapLikely0Or1 { dependency ->
+    when (dependency) {
+        is ExternalDependency -> listOf(dependency)
+        is ImplementationDetail -> dependency.transitiveDependencies.allExternalDependencies()
+    }
+}
