@@ -1,5 +1,6 @@
 package com.woutwerkman.sink
 
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 public annotation class Injectable(
     /**
