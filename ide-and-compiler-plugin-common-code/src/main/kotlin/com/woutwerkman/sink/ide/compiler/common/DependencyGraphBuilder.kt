@@ -539,7 +539,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 
 context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, _: TypeBehavior<TypeExpression, TypeSymbol, *>)
 fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.addFromBytes(
-    injectorResolver: (fqnOfInjector: String) -> FunctionSymbol,
+    injectorResolver: (fqnOfInjector: String) -> FunctionSymbol?,
     bytes: ByteArray,
 ) {
     val size = bytes.readIntAt(0)
@@ -547,7 +547,7 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDe
     repeat(size) {
         val fqnSize = bytes.readIntAt(currentOffset).also { currentOffset += 4 }
         val fqn = bytes.decodeToString(currentOffset, currentOffset + fqnSize).also { currentOffset += fqnSize }
-        val injector = injectorResolver(fqn)
+        val injector = injectorResolver(fqn) ?: return@repeat
         injectables[injector] = injector.parameters.drop(1).map { (name, type) ->
             ExternalDependency(name, type, this)
         }

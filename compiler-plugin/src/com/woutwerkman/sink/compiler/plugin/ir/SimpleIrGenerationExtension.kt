@@ -36,9 +36,9 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrClassSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
+import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
-import org.jetbrains.kotlin.ir.types.classifierOrFail
 import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
@@ -73,9 +73,12 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         // TODO: Use explicit-API compiler flag for some things?
         val injectableCacheInterface = pluginContext.referenceClass(ClassId.topLevel(injectionCacheFqn))
             ?: return // Early exit, this module does not include Sink compile time dependency
-        val injectableCacheType by lazy { injectableCacheInterface.typeWith() }
+        val injectableCacheType = injectableCacheInterface.typeWith()
 
-        val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs()
+        val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs(
+            pluginContext.messageCollector,
+            injectableCacheType,
+        )
 
         val topLevelGraph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
             .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph) { error ->
@@ -418,7 +421,10 @@ fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
         takeWhile { it != startElement }
 
 context(_: TypeBehavior, _: FunctionBehavior)
-private fun IrPluginContext.referenceAllModuleDependencyGraphs(): ModuleDependencyGraph {
+private fun IrPluginContext.referenceAllModuleDependencyGraphs(
+    messageCollector: MessageCollector,
+    injectableCacheType: IrSimpleType,
+): ModuleDependencyGraph {
     val graph = ModuleDependencyGraph()
     referenceFunctions(metadataFunctionCallableId).forEach { metadataFunction ->
         metadataFunction
@@ -432,7 +438,43 @@ private fun IrPluginContext.referenceAllModuleDependencyGraphs(): ModuleDependen
             ?.encodeToByteArray()
             ?.let { metadata ->
                 graph.addFromBytes(
-                    injectorResolver = { referenceFunctions(FqName(it).asCallableId()).single() },
+                    injectorResolver = {
+                        val referenceFunctions = referenceFunctions(FqName(it).asCallableId())
+                        when (referenceFunctions.size) {
+                            0 -> {
+                                messageCollector.report(
+                                    CompilerMessageSeverity.WARNING,
+                                    "A Sink generated module claimed it provides: $it, but no such function was found",
+                                )
+                                null
+                            }
+                            1 -> referenceFunctions.single()
+                            else -> {
+                                val candidates = referenceFunctions.filter {
+                                    it.owner.parameters.firstOrNull { it.kind == IrParameterKind.ExtensionReceiver}?.type == injectableCacheType
+                                }
+                                when (candidates.size) {
+                                    0 -> {
+                                        messageCollector.report(
+                                            CompilerMessageSeverity.WARNING,
+                                            "A Sink generated module claimed it provides: $it, of which there are multiple, but none of them have an extension receiver of type InjectionCache",
+                                        )
+                                        null
+                                    }
+                                    1 -> candidates.single()
+                                    else -> {
+                                        messageCollector.report(
+                                            CompilerMessageSeverity.WARNING,
+                                            "A Sink generated module claimed it provides: $it, but multiple functions were found:\n" +
+                                                "${candidates.joinToString("\n") { it.owner.render() }}\n" +
+                                                "Defaulting to: ${candidates.first().owner.render()}",
+                                        )
+                                        candidates.first()
+                                    }
+                                }
+                            }
+                        }
+                    },
                     bytes = metadata,
                 )
             }
