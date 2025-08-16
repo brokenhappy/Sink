@@ -213,7 +213,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             }
 
             injectionFunction.parameters.map { (name, type) ->
-                // TODO: Uh-oh! We don't differentiate between which graph hosts the function and which graph it resolves from...
                 val matches = hostGraph.findCandidatesForType(type)
                 val dependency =
                     if (matches.isEmpty())
@@ -331,15 +330,6 @@ private fun <
 }
 
 sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
-//    val functionsToDependencies: Map<
-//        FunctionSymbol,
-//        List<WithGraph<
-//            TypeExpression,
-//            FunctionSymbol,
-//            DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-//            ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>,
-//        >>
-//    >
     val injectables: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
     fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>>
@@ -377,9 +367,6 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
         }
         children.forEach { it.forEachInjectable(onInjectable) }
     }
-
-//    override val functionsToDependencies: Map<FunctionSymbol, List<ResolvedDependencyWithGraph<TypeExpression, FunctionSymbol>>>
-//        get() = instantiatorFunctionsToDependencies
 
     context(_: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
     override fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>> =
