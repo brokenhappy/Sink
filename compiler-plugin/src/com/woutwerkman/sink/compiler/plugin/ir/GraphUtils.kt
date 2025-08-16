@@ -3,6 +3,7 @@ package com.woutwerkman.sink.compiler.plugin.ir
 import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
 import com.woutwerkman.sink.ide.compiler.common.ModulesDependencyGraph
+import com.woutwerkman.sink.ide.compiler.common.allExternalDependenciesOf
 import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
 import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
 import org.jetbrains.kotlin.GeneratedDeclarationKey
@@ -413,26 +414,3 @@ internal fun IrSimpleType.typeArgumentsToString(
     }
 
 internal object SinkPluginKey: GeneratedDeclarationKey()
-
-context(typeBehavior: TypeBehavior)
-internal fun DependencyGraph.allExternalDependenciesOf(function: IrFunctionSymbol): List<ExternalDependency> =
-    this.injectables[function]!!.allExternalDependencies().let { dependencies ->
-        val newDependencies = dependencies.toMutableList()
-        var i = 0
-        while (i < newDependencies.size) {
-            val dependency = newDependencies[i]
-            if(newDependencies.withIndex().any { (j, other) ->
-                i != j && typeBehavior.isSubtype(other.type, dependency.type)
-            }) newDependencies.removeAt(i)
-            i++
-        }
-        newDependencies.sortBy { it.parameterName }
-        newDependencies
-    }
-
-private fun List<ResolvedDependency>.allExternalDependencies(): List<ExternalDependency> = flatMapLikely0Or1 { dependency ->
-    when (dependency) {
-        is ExternalDependency -> listOf(dependency)
-        is ImplementationDetail -> dependency.transitiveDependencies.allExternalDependencies()
-    }
-}
