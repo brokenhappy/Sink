@@ -330,6 +330,36 @@ class GraphBuilderTest {
             bazDep.instantiatorOrInjectorFunction.name.assertIs("Bar")
         }
     }
+
+    @Test
+    fun `cross container dependency is resolved in container with solution`() {
+        class Foo
+        class Bar
+        class Baz
+
+        buildDiGraph {
+            public func "bar"("foo"<Foo>()).returns<Bar>()
+            private objec {
+                private func "foo".returns<Foo>()
+                public func "baz"("bar"<Bar>()).returns<Baz>()
+            }
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("bar")
+                .single()
+                .assertIs<ExternalDependency>()
+            graph
+                .dependenciesForFunctionCalled("baz")
+                .single()
+                .assertIs<ImplementationDetail>()
+                .transitiveDependencies
+                .single()
+                .assertIs<ImplementationDetail>()
+                .instantiatorOrInjectorFunction
+                .name
+                .assertIs("foo")
+        }
+    }
 }
 
 private inline fun <reified T> Any?.assertIs(): T =

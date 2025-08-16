@@ -2,6 +2,7 @@ package com.woutwerkman.sink.ide.compiler.common
 
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ExternalDependency
+import jdk.javadoc.internal.doclets.toolkit.util.DocPath.parent
 import java.io.ByteArrayOutputStream
 import java.util.*
 import kotlin.collections.List
@@ -10,7 +11,7 @@ import kotlin.collections.emptyList
 
 class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
     sealed class ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
-        abstract val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>
+        abstract val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
         data class ImplementationDetail<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
             /**
@@ -19,7 +20,10 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
              */
             val instantiatorOrInjectorFunction: FunctionSymbol,
             val transitiveDependencies: List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>,
-            override val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            /** Null means transitive dependencies have not been resolved yet */
+            override val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?,
+            val graphWhereFunctionIsHosted: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            val graphWhereFunctionOriginated: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
         data class ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
@@ -114,7 +118,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     private fun hydrateDependenciesAndTryToResolveLocally(
         topLevelGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
     ) {
-        topLevelGraph.setDependenciesRecursivelyMemoized { graphThatHostsFunction, injectionFunction ->
+        topLevelGraph.setDependenciesRecursivelyMemoized { originGraph, hostGraph, injectionFunction ->
             /**
              * // Module A
              *
@@ -163,21 +167,21 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
              */
             fun ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>.resolvingCrossModuleDependencies(
             ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> = when {
-                graphWhereThisWasResolved === graphThatHostsFunction -> this
+                // Ancestors never have more information, so we can skip these cases.
+                graphWhereThisWasResolved.isNotNullAnd { originGraph.isAncestorOf(it) } -> this
                 this is ResolvedDependency.ImplementationDetail -> this.copy(
-                    graphWhereThisWasResolved = graphThatHostsFunction,
+                    graphWhereThisWasResolved = originGraph,
                     transitiveDependencies =
-                        recurse(this.graphWhereThisWasResolved, instantiatorOrInjectorFunction)
-                            .mapNotNullLikely0Or1 { it as? ExternalDependency }
-                            .mapLikely0Or1 { it.resolvingCrossModuleDependencies() }
+                        recurse(graphWhereFunctionIsHosted, graphWhereFunctionOriginated, instantiatorOrInjectorFunction)
+                            .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() }
                 )
                 this is ExternalDependency ->
                     // The original declaration that depended on this could not resolve this dependency.
                     // However, we are another graph. We can try again!
-                    graphThatHostsFunction
+                    originGraph
                         .findCandidatesForType(this.type)
                         .singleOrNull() // TODO: Handle ambiguous
-                        ?.let { (graphThatHostsThisCandidate, candidate) ->
+                        ?.let { (candidateOriginGraph, candidateHostGraph, candidate) ->
                             // Yay! We were able to resolve a dependency unlike the graph where this dependency came from.
                             // Okay, so far we know that:
                             //  - One of our dependencies was:
@@ -190,28 +194,32 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                             ResolvedDependency.ImplementationDetail(
                                 parameterName = this.parameterName,
                                 instantiatorOrInjectorFunction = candidate,
-                                graphWhereThisWasResolved = graphThatHostsFunction,
-                                transitiveDependencies = recurse(graphThatHostsThisCandidate, candidate)
-                                    .mapNotNullLikely0Or1 { it as? ExternalDependency }
-                                    .mapLikely0Or1 { it.resolvingCrossModuleDependencies() }
+                                graphWhereThisWasResolved = originGraph,
+                                graphWhereFunctionIsHosted = candidateHostGraph,
+                                graphWhereFunctionOriginated = candidateOriginGraph,
+                                transitiveDependencies = recurse(candidateOriginGraph, candidateHostGraph, candidate)
+                                    .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() },
                             )
                         } ?: this
                 else -> throw IllegalStateException("Unexpected dependency: $this")
             }
 
             injectionFunction.parameters.map { (name, type) ->
-                val matches = graphThatHostsFunction.findCandidatesForType(type)
+                // TODO: Uh-oh! We don't differentiate between which graph hosts the function and which graph it resolves from...
+                val matches = hostGraph.findCandidatesForType(type)
                 val dependency =
-                    if (matches.isEmpty()) ExternalDependency(name, type, graphThatHostsFunction)
+                    if (matches.isEmpty())
+                        ExternalDependency(name, type, hostGraph)
                     else {
-                        val (graph, match) = matches.single()
+                        val (matchOriginGraph, matchHostGraph, match) = matches.single()
                         ResolvedDependency.ImplementationDetail(
                             parameterName = name,
                             instantiatorOrInjectorFunction = match,
-                            transitiveDependencies = recurse(graph, match)
-                                .mapNotNullLikely0Or1 { it as? ExternalDependency }
-                                .mapLikely0Or1 { it.resolvingCrossModuleDependencies() },
-                            graphWhereThisWasResolved = graphThatHostsFunction,
+                            transitiveDependencies = recurse(matchOriginGraph, matchHostGraph, match)
+                                .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() },
+                            graphWhereThisWasResolved = null,
+                            graphWhereFunctionIsHosted = matchOriginGraph,
+                            graphWhereFunctionOriginated = matchOriginGraph,
                         )
                     }
                 dependency.resolvingCrossModuleDependencies()
@@ -256,6 +264,14 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
 
         return cycles
     }
+
+    private fun DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.isAncestorOf(
+        maybeChildOrSelf: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+    ): Boolean =
+        maybeChildOrSelf === this ||
+            (maybeChildOrSelf as? DependencyGraphFromSourcesImpl)
+                ?.parent
+                .isNotNullAnd { it.isAncestorOf(this) }
 }
 
 internal val ResolvedDependency<*, *, *, *>.parameterName get(): String = when (this) {
@@ -276,6 +292,12 @@ internal typealias FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol,
 data class WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, V>(
     val graph: G,
     val value: V,
+)
+
+data class FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>(
+    val originatingGraph: G,
+    val hostingGraph: G,
+    val value: FunctionSymbol,
 )
 
 context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
@@ -311,7 +333,7 @@ sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, Dec
 //        >>
 //    >
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    fun findCandidatesForType(type: TypeExpression): List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>>
+    fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>>
 }
 
 interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
@@ -344,14 +366,15 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 //        get() = instantiatorFunctionsToDependencies
 
     context(_: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    override fun findCandidatesForType(type: TypeExpression): List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>> =
+    override fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>> =
         superTypesMap
-            .findCandidatesThatProvide(type)
+            .findCandidatesThatProvide(type, this)
             .let { candidates -> parent?.findCandidatesForType(type)?.plusLikelyEmpty(candidates) ?: candidates }
 
     interface DependencyRecursionContext<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
         fun recurse(
-            graphThatHostsFunction: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            originalGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            hostGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             function: FunctionSymbol,
         ): List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>
     }
@@ -359,7 +382,8 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
     context(_: FunctionBehavior<TypeExpression, FunctionSymbol>)
     internal inline fun setDependenciesRecursivelyMemoized(
         crossinline mapper: DependencyRecursionContext<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.(
-            graphThatHostsFunction: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            originalGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+            hostGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             function: FunctionSymbol,
         ) -> List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>,
     ) {
@@ -368,21 +392,30 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 
         val recursionContext = object : DependencyRecursionContext<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
             override fun recurse(
-                graphThatHostsFunction: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+                originalGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+                hostGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
                 function: FunctionSymbol,
             ): List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>> =
-                when (graphThatHostsFunction) {
+                when (hostGraph) {
                     is DependencyGraphFromSources -> cache.getOrPut(function) {
                         if (!visited.add(function)) emptyList() // Uh-oh! We encountered a cycle. We don't store the result in the map, but instead return an empty list.
-                        else mapper(graphThatHostsFunction as DependencyGraphFromSourcesImpl, function).also {
-                            graphThatHostsFunction.instantiatorFunctionsToDependencies[function] = it
+                        else {
+                            require(hostGraph is DependencyGraphFromSourcesImpl)
+                            require(originalGraph is DependencyGraphFromSourcesImpl)
+                            mapper(originalGraph, hostGraph, function).also {
+                                hostGraph.instantiatorFunctionsToDependencies[function] = it
+                            }
                         }
                     }
-                    is ModulesDependencyGraph -> graphThatHostsFunction.injectables[function]!!
+                    is ModulesDependencyGraph -> hostGraph.injectables[function]!!
                 }
         }
 
-        instantiatorFunctionsToDependencies.keys.forEach { recursionContext.recurse(this, it) }
+        superTypesMap.values.forEach { graphsAndSymbols ->
+            graphsAndSymbols.forEach { (originalGraph, function) ->
+                recursionContext.recurse(hostGraph = this, originalGraph = originalGraph, function = function)
+            }
+        }
     }
 
     context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
@@ -429,12 +462,14 @@ class ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, Declara
     val injectables: MutableMap<FunctionSymbol, List<ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>> = mutableMapOf()
 
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    override fun findCandidatesForType(type: TypeExpression): List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>> =
+    override fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>> =
         typeBehavior
             .asConcreteType(type)
             ?.symbol
             ?.let { typeSymbol -> supertypesMap[typeSymbol]}
-            ?.pickCandidatesToProvide(type, this)
+            ?.mapNotNullLikely0Or1 { injectable ->
+                if (typeBehavior.isSubtype(injectable.returnType, type)) FunctionWithGraphs(this, this, injectable) else null
+            }
             ?: emptyList()
 }
 
@@ -517,20 +552,31 @@ public inline fun <T, R> List<T>.flatMapLikelySingle(mapper: (T) -> List<R>): Li
 context(behavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
 internal fun <TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G : DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>> Map<TypeSymbol, List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G, FunctionSymbol>>>.findCandidatesThatProvide(
     type: TypeExpression,
-): List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G, FunctionSymbol>> = behavior
+    hostGraph: G,
+): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G>> = behavior
     .asConcreteType(type)
     ?.symbol
     ?.let { symbol -> this[symbol] }
-    ?.filterLikely0Or1 { injectableWithGraph -> behavior.isSubtype(injectableWithGraph.value.returnType, type) }
+    ?.mapNotNullLikely0Or1 { (originalGraph, injectable) ->
+        if (!behavior.isSubtype(injectable.returnType, type)) null
+        else FunctionWithGraphs(originalGraph, hostGraph, injectable)
+    }
     ?: emptyList()
 
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, behavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
-private fun <TypeExpression, TypeSymbol, FunctionSymbol, DeclarationContainer, G : DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>> Iterable<FunctionSymbol>.pickCandidatesToProvide(
+private fun <
+    TypeExpression,
+    TypeSymbol,
+    FunctionSymbol,
+    DeclarationContainer,
+    G : DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+> Iterable<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G, FunctionSymbol>>.pickCandidatesToProvide(
     type: TypeExpression,
-    graph: G,
-): List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G, FunctionSymbol>> = mapNotNullLikely0Or1 { injectable ->
-    if (behavior.isSubtype(injectable.returnType, type)) WithGraph(graph, injectable) else null
-}
+    hostingGraph: G,
+): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G>> =
+    mapNotNullLikely0Or1 { (originalGraph, injectable) ->
+        if (behavior.isSubtype(injectable.returnType, type)) FunctionWithGraphs(originalGraph, hostingGraph, injectable) else null
+    }
 
 private inline fun <T, R> Collection<T>.mapLikely0Or1(mapper: (T) -> R): List<R> = when (size) {
     0 -> emptyList()
