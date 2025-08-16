@@ -1,5 +1,8 @@
 package com.woutwerkman.sink
 
+/**
+ * Indicates that this function (or class) can be injected.
+ */
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 public annotation class Injectable(
