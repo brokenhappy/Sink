@@ -2,7 +2,6 @@ package com.woutwerkman.sink.ide.compiler.common
 
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ExternalDependency
-import jdk.javadoc.internal.doclets.toolkit.util.DocPath.parent
 import java.io.ByteArrayOutputStream
 import java.util.*
 import kotlin.collections.List
@@ -343,9 +342,13 @@ interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol,
     val parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
     val instantiatorFunctionsToDependencies: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
     fun forEachInjectable(onInjectable: (FunctionSymbol) -> Unit)
-    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
-    fun serializeAsModuleDependencyGraph(): ByteArray
     val children: List<DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
+    context(
+        _: FunctionBehavior<TypeExpression, FunctionSymbol>,
+        typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
+        declarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
+    )
+    fun serializeAsModuleDependencyGraph(): ByteArray
 }
 
 internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(
@@ -418,11 +421,16 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
         }
     }
 
-    context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
+    context(
+        _: FunctionBehavior<TypeExpression, FunctionSymbol>,
+        typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
+        declarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
+    )
     override fun serializeAsModuleDependencyGraph(): ByteArray {
-        val buffer = ByteArrayOutputStream(instantiatorFunctionsToDependencies.size * 32)
-        buffer.writeInt(instantiatorFunctionsToDependencies.size)
-        for (injectable in instantiatorFunctionsToDependencies.keys) {
+        val containerFunctions = container.getAllPublicDeclarationsRecursively()
+        val buffer = ByteArrayOutputStream(containerFunctions.size * 32)
+        buffer.writeInt(containerFunctions.size)
+        for (injectable in containerFunctions) {
             val fqnBytes =  (
                 injectable
                     .fqn
@@ -436,6 +444,29 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
             buffer.write(fqnBytes)
         }
         return buffer.toByteArray()
+    }
+
+    context(
+        _: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
+        _: FunctionBehavior<TypeExpression, FunctionSymbol>,
+    )
+    private fun DeclarationContainer.getAllPublicDeclarationsRecursively(): List<FunctionSymbol> =
+        mutableListOf<FunctionSymbol>().also { result -> result.addAllRecursiveDeclarationsOf(this) }
+
+    context(
+        declarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
+        functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
+    )
+    private fun MutableList<FunctionSymbol>.addAllRecursiveDeclarationsOf(
+        container: DeclarationContainer,
+    ) {
+        if (declarationContainerBehavior.getVisibilityOf(container) != DeclarationVisibility.Public) return
+        declarationContainerBehavior.getDeclarationsOf(container).forEach { declaration ->
+            if (functionBehavior.getVisibilityOf(declaration) == DeclarationVisibility.Public) add(declaration)
+        }
+        declarationContainerBehavior.getChildrenOf(container).forEach { child ->
+            addAllRecursiveDeclarationsOf(child)
+        }
     }
 }
 

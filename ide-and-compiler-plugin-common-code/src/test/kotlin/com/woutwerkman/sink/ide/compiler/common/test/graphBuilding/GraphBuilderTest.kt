@@ -127,6 +127,25 @@ class GraphBuilderTest {
     }
 
     @Test
+    fun `can resolve internal injectable through internal object`() {
+        class Foo
+        class Bar
+
+        buildDiGraph {
+            public func "foo"("bar"<Bar>()).returns<Foo>()
+
+            internal objec {
+                internal func "bar".returns<Bar>()
+            }
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("foo")
+                .single()
+                .assertIs<ImplementationDetail>()
+        }
+    }
+
+    @Test
     fun `resolve to the outside, even inner is private`() {
         class Foo
         class Bar
@@ -136,6 +155,26 @@ class GraphBuilderTest {
 
             public objec {
                 private func "foo"("bar"<Bar>()).returns<Foo>()
+            }
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("foo")
+                .single()
+                .assertIs<ImplementationDetail>()
+                .assert { it.instantiatorOrInjectorFunction.name == "bar" }
+        }
+    }
+
+    @Test
+    fun `resolve to the outside, even outer is internal`() {
+        class Foo
+        class Bar
+
+        buildDiGraph {
+            internal func "bar".returns<Bar>()
+
+            public objec {
+                public func "foo"("bar"<Bar>()).returns<Foo>()
             }
         }.also { graph ->
             graph
@@ -422,6 +461,74 @@ class GraphBuilderTest {
                 .assert { it.instantiatorOrInjectorFunction.name == "bar" }
         }
     }
+
+    @Test
+    fun `internal instantiators are not serialized into module graph`() {
+        class Foo
+        class Bar
+
+        val upstream = buildDiGraph {
+            internal func "foo".returns<Foo>()
+            public func "bar"("foo"<Foo>()).returns<Bar>()
+        }.toModuleGraph()
+
+        buildDiGraph(upstream) {
+            public func "needsBar"("bar"<Bar>()).returns<Unit>()
+            public func "needsFoo"("foo"<Foo>()).returns<Unit>()
+        }.also { graph ->
+            graph.dependenciesForFunctionCalled("needsBar").single().assertIs<ImplementationDetail>()
+            graph.dependenciesForFunctionCalled("needsFoo").single().assertIs<ExternalDependency>()
+        }
+    }
+
+    @Test
+    fun `private instantiators are not serialized into module graph`() {
+        class Foo
+
+        buildDiGraph(
+            buildDiGraph {
+                private func "foo".returns<Foo>()
+            }.toModuleGraph()
+        ) {
+            public func "needsFoo"("foo"<Foo>()).returns<Unit>()
+        }.also { graph ->
+            graph.dependenciesForFunctionCalled("needsFoo").single().assertIs<ExternalDependency>()
+        }
+    }
+
+    @Test
+    fun `public instantiators inside internal object are not serialized into module graph`() {
+        class Foo
+
+        buildDiGraph(
+            buildDiGraph {
+                internal objec {
+                    public func "foo".returns<Foo>()
+                }
+            }.toModuleGraph()
+        ) {
+            public func "needsFoo"("foo"<Foo>()).returns<Unit>()
+        }.also { graph ->
+            graph.dependenciesForFunctionCalled("needsFoo").single().assertIs<ExternalDependency>()
+        }
+    }
+
+    @Test
+    fun `internal instantiators inside public object are not serialized into module graph`() {
+        class Foo
+
+        buildDiGraph(
+            buildDiGraph {
+                public objec {
+                    internal func "foo".returns<Foo>()
+                }
+            }.toModuleGraph()
+        ) {
+            public func "needsFoo"("foo"<Foo>()).returns<Unit>()
+        }.also { graph ->
+            graph.dependenciesForFunctionCalled("needsFoo").single().assertIs<ExternalDependency>()
+        }
+    }
 }
 
 private inline fun <reified T> Any?.assertIs(): T =
@@ -533,7 +640,7 @@ private fun DependencyGraphFromSources.toModuleGraph(): ModuleDependencyGraph {
             )
         }
     }
-    return context(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior) {
+    return context(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior, DeclarationContainerBehavior) {
         ModuleDependencyGraph().apply {
             addFromBytes(
                 injectorResolver = { name: String -> resolverMap[name] ?: error("Unknown injector $name") },
