@@ -124,7 +124,26 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
 
             val requestedType = getCall.typeArguments.single()!!
 
-            val (_, hostGraph, chosen) = graph.findCandidatesForType(requestedType).single() // TODO: Handle
+            val candidates = graph.findCandidatesForType(requestedType)
+            val (_, hostGraph, chosen) = when (candidates.size) {
+                0 -> {
+                    pluginContext.messageCollector.report(
+                        CompilerMessageSeverity.ERROR,
+                        "No injection candidates found for type ${requestedType.render()}",
+                        getCall.getCompilerMessageLocation(file),
+                    )
+                    return@transformAllGetCalls getCall
+                }
+                1 -> candidates.single()
+                else -> {
+                    pluginContext.messageCollector.report(
+                        CompilerMessageSeverity.ERROR,
+                        "Found multiple injectable candidates for this type:\n" +
+                            candidates.joinToString("\n") { it.value.owner.render() }
+                    )
+                    return@transformAllGetCalls getCall
+                }
+            }
             val injectionFunction = creationSession.generateInjectionFunction(chosen.owner, hostGraph)
 
             val requiredParams: List<IrType> = hostGraph
