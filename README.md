@@ -6,7 +6,7 @@ This DI (Dependency Injection) Framework uses Kotlin's modern syntax to improve 
 
 Sorry, I haven't published any tag yet. If you'd like to try an early version, please let me know :).
 
-The DI framework with the closest UX is currently: [Inject by IVIanuu](https://github.com/IVIanuu/injekt)
+The DI framework with the closest UX is currently: [Injekt by IVIanuu](https://github.com/IVIanuu/injekt)
 
 ## Core principles
 

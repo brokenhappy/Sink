@@ -264,17 +264,16 @@ class GraphBuilderTest {
         class Foo
         class Bar
 
-        buildDiGraph {
+        getBuildErrors {
             public func "foo"("bar"<Bar>()).returns<Foo>()
             public func "bar"("foo"<Foo>()).returns<Bar>()
-        }.also { graph ->
-            graph.injectables.size.assertIs(2)
-//            graph TODO: Update this test
-//                .cycles
-//                .single()
-//                .map { it.name }
-//                .toSet()
-//                .assertIs(setOf("bar", "foo"))
+        }.also { errors ->
+            (errors.single() as CycleDetected)
+                .cycle
+                .assert { it.size == 2 }
+                .map { it.name }
+                .toSet()
+                .assertIs(setOf("bar", "foo"))
         }
     }
 
@@ -425,18 +424,17 @@ class GraphBuilderTest {
         class B
         class C
 
-        buildDiGraph {
+        getBuildErrors {
             public func "a"("c"<C>()).returns<A>()
             public func "b"("a"<A>()).returns<B>()
             public func "c"("b"<B>()).returns<C>()
-        }.also { graph ->
-            graph.injectables.size.assertIs(3)
-//            graph
-//                .cycles
-//                .single()
-//                .map { it.name }
-//                .toSet()
-//                .assertIs(setOf("a", "b", "c"))
+        }.also { errors ->
+            (errors.single() as CycleDetected)
+                .cycle
+                .assert { it.size == 3 }
+                .map { it.name }
+                .toSet()
+                .assertIs(setOf("a", "b", "c"))
         }
     }
 
@@ -595,15 +593,23 @@ data class FunctionSignatureAndReturnType(val signature: FunctionSignature, val 
 
 private fun buildDiGraph(
     modulesDependencyGraph: ModuleDependencyGraph = ModuleDependencyGraph(),
+    onError: (GraphBuildingError) -> Unit = {},
     builder: TestDoubleFunctionBuilder.() -> Unit,
 ): DependencyGraphFromSources =
     context(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior, DeclarationContainerBehavior) {
         DependencyGraphBuilder<KType, FunctionSymbol, KClass<*>, DeclarationContainer>().buildGraph(
             buildInjectableContainer(DeclarationVisibility.Public, builder),
             modulesDependencyGraph = modulesDependencyGraph,
-            onError = { fail("Expected no errors but got: $it") },
+            onError = onError,
         )
     }
+
+private fun getBuildErrors(
+    modulesDependencyGraph: ModuleDependencyGraph = ModuleDependencyGraph(),
+    builder: TestDoubleFunctionBuilder.() -> Unit,
+): List<GraphBuildingError> = buildList {
+    buildDiGraph(modulesDependencyGraph, onError = ::add, builder)
+}
 
 private fun buildInjectableContainer(visibility: DeclarationVisibility, builder: TestDoubleFunctionBuilder.() -> Unit): DeclarationContainer =
     context(TestDoubleFunctionAsInjectableBehavior, KTypeBehavior, DeclarationContainerBehavior) {
@@ -660,6 +666,8 @@ private typealias DependencyGraphFromSources = com.woutwerkman.sink.ide.compiler
 private typealias ModuleDependencyGraph = ModulesDependencyGraph<FunctionSymbol, KType, KClass<*>, DeclarationContainer>
 private typealias ImplementationDetail = DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<KType, FunctionSymbol, KClass<*>, DeclarationContainer>
 private typealias ExternalDependency = DependencyGraphBuilder.ResolvedDependency.ExternalDependency<KType, FunctionSymbol, KClass<*>, DeclarationContainer>
+private typealias GraphBuildingError = DependencyGraphBuilder.GraphBuildingError<KType, FunctionSymbol, KClass<*>, DeclarationContainer>
+private typealias CycleDetected = DependencyGraphBuilder.GraphBuildingError.CycleDetected<KType, FunctionSymbol, KClass<*>, DeclarationContainer>
 
 
 object TestDoubleFunctionAsInjectableBehavior : FunctionBehavior<KType, FunctionSymbol> {
