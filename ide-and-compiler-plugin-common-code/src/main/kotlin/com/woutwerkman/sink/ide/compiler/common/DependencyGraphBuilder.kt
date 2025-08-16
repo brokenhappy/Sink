@@ -23,11 +23,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             override val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?,
             val graphWhereFunctionIsHosted: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             val graphWhereFunctionOriginated: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-        ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
-            init {
-                val a = 1
-            }
-        }
+        ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
         data class ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
             val type: TypeExpression,
