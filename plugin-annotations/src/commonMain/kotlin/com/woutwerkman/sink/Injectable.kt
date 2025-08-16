@@ -3,8 +3,12 @@ package com.woutwerkman.sink
 @Retention(AnnotationRetention.SOURCE)
 public annotation class Injectable(
     /**
-     * Can be "public", "private", or "internal".
+     * Determines how visible this injectable is.
+     * AKA, in which scope it can be injected.
+     *
      * By default, the visibility is inferred from the visibility of the return type
+     *
+     * Can be "public", "private", or "internal".
      */
     val visibility: String = "",
 )
