@@ -31,6 +31,10 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
         ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
     }
 
+    sealed class GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
+
+    }
+
     context(
         declarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
         functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>,
@@ -39,6 +43,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     public fun buildGraph(
         container: DeclarationContainer,
         modulesDependencyGraph: ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit,
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> =
         hydratePublicInjectables(container, parentGraph = modulesDependencyGraph).also { graph ->
             fun hydrateDependenciesAndTryToResolveLocallyRecursive(

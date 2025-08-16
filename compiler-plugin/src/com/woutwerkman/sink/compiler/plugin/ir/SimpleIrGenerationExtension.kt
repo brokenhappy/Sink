@@ -3,8 +3,12 @@ package com.woutwerkman.sink.compiler.plugin.ir
 // TODO: Ensure Nullability handled
 // TODO: Add support for kx Serializer injection? Might be cool icw generic support
 
+import com.woutwerkman.sink.compiler.plugin.metadataFunctionCallableId
+import com.woutwerkman.sink.compiler.plugin.somewhatIdentifyingName
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
 import com.woutwerkman.sink.ide.compiler.common.addFromBytes
+import com.woutwerkman.sink.ide.compiler.common.allExternalDependenciesOf
+import com.woutwerkman.sink.ide.compiler.common.mapLikely0Or1
 import org.jetbrains.kotlin.backend.common.extensions.IrGeneratedDeclarationsRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -12,11 +16,6 @@ import org.jetbrains.kotlin.backend.common.getCompilerMessageLocation
 import org.jetbrains.kotlin.backend.jvm.ir.isInCurrentModule
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import com.woutwerkman.sink.compiler.plugin.metadataFunctionCallableId
-import com.woutwerkman.sink.compiler.plugin.somewhatIdentifyingName
-import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
-import com.woutwerkman.sink.ide.compiler.common.mapLikely0Or1
-import com.woutwerkman.sink.ide.compiler.common.mapNotNullLikely0Or1
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
@@ -78,7 +77,9 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs()
 
         val topLevelGraph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
-            .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph)
+            .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph, onError = {
+
+            })
 
         topLevelGraph.cycles.forEach { cycle ->
             pluginContext.messageCollector.reportErrorsForCycle(cycle)
