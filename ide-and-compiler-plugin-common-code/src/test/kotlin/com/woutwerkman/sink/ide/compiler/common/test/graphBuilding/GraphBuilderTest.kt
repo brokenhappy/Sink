@@ -360,6 +360,68 @@ class GraphBuilderTest {
                 .assertIs("foo")
         }
     }
+
+    @Test
+    fun `sibling private containers cannot access each other's injectables`() {
+        class Foo
+        class Baz
+
+        buildDiGraph {
+            public objec {
+                private func "foo".returns<Foo>()
+            }
+            public objec {
+                public func "baz"("foo"<Foo>()).returns<Baz>()
+            }
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("baz")
+                .single()
+                .assertIs<ExternalDependency>()
+        }
+    }
+
+    @Test
+    fun `triple node cyclic dependency`() {
+        class A
+        class B
+        class C
+
+        buildDiGraph {
+            public func "a"("c"<C>()).returns<A>()
+            public func "b"("a"<A>()).returns<B>()
+            public func "c"("b"<B>()).returns<C>()
+        }.also { graph ->
+            graph.instantiatorFunctionsToDependencies.size.assertIs(3)
+            graph
+                .cycles
+                .single()
+                .map { it.name }
+                .toSet()
+                .assertIs(setOf("a", "b", "c"))
+        }
+    }
+
+    @Test
+    fun `can resolve dependency from ancestor two levels up`() {
+        class Foo
+        class Bar
+
+        buildDiGraph {
+            public func "bar".returns<Bar>()
+            private objec {
+                private objec {
+                    public func "foo"("bar"<Bar>()).returns<Foo>()
+                }
+            }
+        }.also { graph ->
+            graph
+                .dependenciesForFunctionCalled("foo")
+                .single()
+                .assertIs<ImplementationDetail>()
+                .assert { it.instantiatorOrInjectorFunction.name == "bar" }
+        }
+    }
 }
 
 private inline fun <reified T> Any?.assertIs(): T =
