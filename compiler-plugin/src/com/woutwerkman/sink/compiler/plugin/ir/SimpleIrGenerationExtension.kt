@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrValueParameterSymbolImpl
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
+import org.jetbrains.kotlin.ir.types.classifierOrFail
 import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
@@ -77,13 +78,16 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
         val modulesDependencyGraph = pluginContext.referenceAllModuleDependencyGraphs()
 
         val topLevelGraph = DependencyGraphBuilder<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>()
-            .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph, onError = {
-
-            })
-
-        topLevelGraph.cycles.forEach { cycle ->
-            pluginContext.messageCollector.reportErrorsForCycle(cycle)
-        }
+            .buildGraph(DeclarationContainer.ModuleAsContainer(moduleFragment), modulesDependencyGraph) { error ->
+                when (error) {
+                    is AmbiguousDependencyResolution -> pluginContext
+                        .messageCollector
+                        .reportErrorsAmbiguousResolve(error)
+                    is CycleDetected -> pluginContext
+                        .messageCollector
+                        .reportErrorsForCycle(error.cycle)
+                }
+            }
 
         val creationSession = InjectionFunctionCreationSession(
             pluginContext,
@@ -357,6 +361,33 @@ private fun MessageCollector.reportErrorsForCycle(cycle: List<IrFunctionSymbol>)
                 cycleElement.owner.getCompilerMessageLocation(cycleElement.owner.file),
             )
         }
+}
+
+private fun MessageCollector.reportErrorsAmbiguousResolve(error: AmbiguousDependencyResolution) {
+    val chain = error.transitiveChain
+    if (chain == null) {
+        val param = error.requestingFunction.owner.parameters.first { it.name.asString() == error.parameterName }
+        report(
+            CompilerMessageSeverity.ERROR,
+            "Found multiple injectable candidates for this type:\n${
+                error.candidateFunctions.joinToString("\n") { it.owner.render() }
+            }",
+            param.getCompilerMessageLocation(error.requestingFunction.owner.file),
+        )
+    } else {
+        val param = chain.last().let { lastStep ->
+            lastStep.requestingFunction.owner.parameters.first { it.name.asString() == lastStep.parameterName }
+        }
+        report(
+            CompilerMessageSeverity.ERROR,
+            "Transitively, this dependency depends on ${error.parameterType}, for which there are multiple candidates\n" +
+                "Transitive chain: ${chain.reversed().joinToString(" -> ") { it.requestingFunction.owner.returnType.render() }}\n" +
+                "Candidates: ${
+                    error.candidateFunctions.joinToString("\n") { it.owner.render() }
+                }",
+            param.getCompilerMessageLocation(error.requestingFunction.owner.file),
+        )
+    }
 }
 
 // TODO: Introduce error for ambiguous type dependency

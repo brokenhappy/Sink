@@ -48,6 +48,10 @@ internal typealias ImplementationDetail =
     DependencyGraphBuilder.ResolvedDependency.ImplementationDetail<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 internal typealias TypeBehavior =
     com.woutwerkman.sink.ide.compiler.common.TypeBehavior<IrType, IrClassifierSymbol, IrTypeParameterSymbol>
+internal typealias AmbiguousDependencyResolution =
+    DependencyGraphBuilder.GraphBuildingError.AmbiguousDependencyResolution<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
+internal typealias CycleDetected =
+    DependencyGraphBuilder.GraphBuildingError.CycleDetected<IrType, IrFunctionSymbol, IrClassifierSymbol, DeclarationContainer>
 
 internal sealed class DeclarationContainer {
     data class ModuleAsContainer(val moduleFragment: IrModuleFragment) : DeclarationContainer()

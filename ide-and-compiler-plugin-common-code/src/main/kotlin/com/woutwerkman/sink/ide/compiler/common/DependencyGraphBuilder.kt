@@ -1,5 +1,6 @@
 package com.woutwerkman.sink.ide.compiler.common
 
+import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.GraphBuildingError.AmbiguousDependencyResolution.TransitiveDependencyStep
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency
 import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedDependency.ExternalDependency
 import java.io.ByteArrayOutputStream
@@ -38,7 +39,14 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             val parameterType: TypeExpression,
             val candidateFunctions: List<FunctionSymbol>,
             val attemptedGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-        ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
+            val transitiveChain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
+        ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
+            data class TransitiveDependencyStep<TypeExpression, FunctionSymbol>(
+                val requestingFunction: FunctionSymbol,
+                val parameterName: String,
+                val parameterType: TypeExpression,
+            )
+        }
         data class CycleDetected<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val cycle: List<FunctionSymbol>,
         ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
@@ -52,7 +60,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     public fun buildGraph(
         container: DeclarationContainer,
         modulesDependencyGraph: ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit = {},
+        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit,
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> =
         hydratePublicInjectables(container, parentGraph = modulesDependencyGraph).also { graph ->
             fun hydrateDependenciesAndTryToResolveLocallyRecursive(
@@ -139,7 +147,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
         topLevelGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
         onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit,
     ) {
-        topLevelGraph.setDependenciesRecursivelyMemoized { originGraph, hostGraph, injectionFunction ->
+        topLevelGraph.setDependenciesRecursivelyMemoized { originGraph, hostGraph, injectionFunction, chain ->
             /**
              * // Module A
              *
@@ -187,14 +195,19 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
              * )
              */
             fun ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>.resolvingCrossModuleDependencies(
+                chain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
             ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> = when {
                 // Ancestors never have more information, so we can skip these cases.
                 graphWhereThisWasResolved.isNotNullAnd { originGraph.isAncestorOf(it) } -> this
                 this is ResolvedDependency.ImplementationDetail -> this.copy(
                     graphWhereThisWasResolved = originGraph,
                     transitiveDependencies =
-                        recurse(graphWhereFunctionIsHosted, graphWhereFunctionOriginated, instantiatorOrInjectorFunction)
-                            .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() }
+                        recurse(graphWhereFunctionIsHosted, graphWhereFunctionOriginated, instantiatorOrInjectorFunction, chain)
+                            .mapNotNullLikely0Or1 {
+                                (it as? ExternalDependency)?.resolvingCrossModuleDependencies(chain.prefixedBy(
+                                    TransitiveDependencyStep(instantiatorOrInjectorFunction, it.parameterName, it.type),
+                                ))
+                            }
                 )
                 this is ExternalDependency ->
                     // The original declaration that depended on this could not resolve this dependency.
@@ -213,6 +226,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                                             parameterType = this.type,
                                             candidateFunctions = candidates.map { it.value },
                                             attemptedGraph = originGraph,
+                                            transitiveChain = chain,
                                         )
                                     )
                                     null
@@ -235,8 +249,12 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                                 graphWhereThisWasResolved = originGraph,
                                 graphWhereFunctionIsHosted = candidateHostGraph,
                                 graphWhereFunctionOriginated = candidateOriginGraph,
-                                transitiveDependencies = recurse(candidateOriginGraph, candidateHostGraph, candidate)
-                                    .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() },
+                                transitiveDependencies = recurse(candidateOriginGraph, candidateHostGraph, candidate, chain)
+                                    .mapNotNullLikely0Or1 {
+                                        (it as? ExternalDependency)?.resolvingCrossModuleDependencies(chain.prefixedBy(
+                                            TransitiveDependencyStep(candidate, it.parameterName, it.type),
+                                        ))
+                                    }
                             )
                         } ?: this
                 else -> throw IllegalStateException("Unexpected dependency: $this")
@@ -251,8 +269,12 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                         ResolvedDependency.ImplementationDetail(
                             parameterName = name,
                             instantiatorOrInjectorFunction = match,
-                            transitiveDependencies = recurse(matchOriginGraph, matchHostGraph, match)
-                                .mapNotNullLikely0Or1 { (it as? ExternalDependency)?.resolvingCrossModuleDependencies() },
+                            transitiveDependencies = recurse(matchOriginGraph, matchHostGraph, match, chain)
+                                .mapNotNullLikely0Or1 {
+                                    (it as? ExternalDependency)?.resolvingCrossModuleDependencies(chain.prefixedBy(
+                                        TransitiveDependencyStep(match, it.parameterName, it.type),
+                                    ))
+                                },
                             graphWhereThisWasResolved = null,
                             graphWhereFunctionIsHosted = matchHostGraph,
                             graphWhereFunctionOriginated = matchOriginGraph,
@@ -266,13 +288,14 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                                 parameterName = name,
                                 parameterType = type,
                                 candidateFunctions = matches.map { it.value },
+                                transitiveChain = chain,
                             )
                         )
                         // Keep as external to allow potential cross-graph resolution and continue building
                         ExternalDependency(name, type, hostGraph)
                     }
                 }
-                dependency.resolvingCrossModuleDependencies()
+                dependency.resolvingCrossModuleDependencies(chain)
             }
         }
     }
@@ -420,6 +443,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
             originalGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             hostGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             function: FunctionSymbol,
+            chain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
         ): List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>
     }
 
@@ -429,6 +453,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
             originalGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             hostGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             function: FunctionSymbol,
+            chain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
         ) -> List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>,
     ) {
         val cache = HashMap<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>()
@@ -439,6 +464,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
                 originalGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
                 hostGraph: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
                 function: FunctionSymbol,
+                chain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
             ): List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>> =
                 when (hostGraph) {
                     is DependencyGraphFromSources -> cache.getOrPut(function) {
@@ -446,7 +472,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
                         else {
                             require(hostGraph is DependencyGraphFromSourcesImpl)
                             require(originalGraph is DependencyGraphFromSourcesImpl)
-                            mapper(originalGraph, hostGraph, function).also {
+                            mapper(originalGraph, hostGraph, function, chain).also {
                                 hostGraph.injectables[function] = it
                             }
                         }
@@ -457,7 +483,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 
         superTypesMap.values.forEach { graphsAndSymbols ->
             graphsAndSymbols.forEach { (originalGraph, function) ->
-                recursionContext.recurse(hostGraph = this, originalGraph = originalGraph, function = function)
+                recursionContext.recurse(hostGraph = this, originalGraph = originalGraph, function = function, chain = null)
             }
         }
     }
@@ -624,3 +650,9 @@ private fun <
     mapNotNullLikely0Or1 { (originalGraph, injectable) ->
         if (behavior.isSubtype(injectable.returnType, type)) FunctionWithGraphs(originalGraph, hostingGraph, injectable) else null
     }
+
+data class LinkList<T>(val head: T, val tail: LinkList<T>?): Iterable<T> {
+    override fun iterator(): Iterator<T> =
+        generateSequence(this) { it.tail }.map { it.head }.iterator()
+}
+fun <T> LinkList<T>?.prefixedBy(head: T): LinkList<T> = LinkList(head, this)
