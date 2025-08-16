@@ -32,7 +32,16 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     }
 
     sealed class GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
-
+        data class AmbiguousDependencyResolution<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+            val requestingFunction: FunctionSymbol,
+            val parameterName: String,
+            val parameterType: TypeExpression,
+            val candidateFunctions: List<FunctionSymbol>,
+            val attemptedGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+        ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
+        data class CycleDetected<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+            val cycle: List<FunctionSymbol>,
+        ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
     }
 
     context(
@@ -43,18 +52,20 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     public fun buildGraph(
         container: DeclarationContainer,
         modulesDependencyGraph: ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit,
+        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit = {},
     ): DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> =
         hydratePublicInjectables(container, parentGraph = modulesDependencyGraph).also { graph ->
             fun hydrateDependenciesAndTryToResolveLocallyRecursive(
                 graph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             ) {
-                hydrateDependenciesAndTryToResolveLocally(graph)
+                hydrateDependenciesAndTryToResolveLocally(graph, onError)
                 graph.children.forEach { child -> hydrateDependenciesAndTryToResolveLocallyRecursive(child) }
             }
 
             hydrateDependenciesAndTryToResolveLocallyRecursive(graph)
-            graph.cycles = graph.injectables.findCycles()
+            graph.injectables.findCycles().forEach { cycle ->
+                onError(GraphBuildingError.CycleDetected(cycle))
+            }
         }
 
     context(
@@ -126,6 +137,7 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
     context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
     private fun hydrateDependenciesAndTryToResolveLocally(
         topLevelGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
+        onError: (GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>) -> Unit,
     ) {
         topLevelGraph.setDependenciesRecursivelyMemoized { originGraph, hostGraph, injectionFunction ->
             /**
@@ -189,7 +201,24 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                     // However, we are another graph. We can try again!
                     originGraph
                         .findCandidatesForType(this.type)
-                        .singleOrNull() // TODO: Handle ambiguous
+                        .let { candidates ->
+                            when (candidates.size) {
+                                0 -> null
+                                1 -> candidates.single()
+                                else -> {
+                                    onError(
+                                        GraphBuildingError.AmbiguousDependencyResolution(
+                                            requestingFunction = injectionFunction,
+                                            parameterName = this.parameterName,
+                                            parameterType = this.type,
+                                            candidateFunctions = candidates.map { it.value },
+                                            attemptedGraph = originGraph,
+                                        )
+                                    )
+                                    null
+                                }
+                            }
+                        }
                         ?.let { (candidateOriginGraph, candidateHostGraph, candidate) ->
                             // Yay! We were able to resolve a dependency unlike the graph where this dependency came from.
                             // Okay, so far we know that:
@@ -215,10 +244,9 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
 
             injectionFunction.parameters.map { (name, type) ->
                 val matches = hostGraph.findCandidatesForType(type)
-                val dependency =
-                    if (matches.isEmpty())
-                        ExternalDependency(name, type, hostGraph)
-                    else {
+                val dependency = when (matches.size) {
+                    0 -> ExternalDependency(name, type, hostGraph)
+                    1 -> {
                         val (matchOriginGraph, matchHostGraph, match) = matches.single()
                         ResolvedDependency.ImplementationDetail(
                             parameterName = name,
@@ -230,6 +258,20 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
                             graphWhereFunctionOriginated = matchOriginGraph,
                         )
                     }
+                    else -> {
+                        onError(
+                            GraphBuildingError.AmbiguousDependencyResolution(
+                                requestingFunction = injectionFunction,
+                                attemptedGraph = hostGraph,
+                                parameterName = name,
+                                parameterType = type,
+                                candidateFunctions = matches.map { it.value },
+                            )
+                        )
+                        // Keep as external to allow potential cross-graph resolution and continue building
+                        ExternalDependency(name, type, hostGraph)
+                    }
+                }
                 dependency.resolvingCrossModuleDependencies()
             }
         }
@@ -339,7 +381,6 @@ sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, Dec
 interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
     val superTypesMap: Map<TypeSymbol, List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>>>
     val container: DeclarationContainer
-    val cycles: List<List<FunctionSymbol>>
     val parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
     fun forEachInjectable(onInjectable: (hostingGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol) -> Unit)
     val children: List<DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
@@ -355,7 +396,6 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
     override val injectables: MutableMap<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>,
     override val superTypesMap: MutableMap<TypeSymbol, MutableList<FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>,
     override var container: DeclarationContainer,
-    override var cycles: List<List<FunctionSymbol>> = emptyList(),
     override var parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>? = null,
 ) : DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
     override lateinit var children: List<DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
