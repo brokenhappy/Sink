@@ -9,10 +9,10 @@ import kotlin.collections.List
 import kotlin.collections.emptyList
 
 
-class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
-    sealed class ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
-        abstract val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
-        data class ImplementationDetail<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+public class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
+    public sealed class ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
+        public abstract val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
+        public data class ImplementationDetail<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
             /**
              * In case of a function in our module's sources, this function is an [InstantiatorFunctionsDocRef].
@@ -25,15 +25,15 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             val graphWhereFunctionIsHosted: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             val graphWhereFunctionOriginated: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
-        data class ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+        public data class ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val parameterName: String,
             val type: TypeExpression,
             override val graphWhereThisWasResolved: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
         ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
     }
 
-    sealed class GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
-        data class AmbiguousDependencyResolution<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+    public sealed class GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> {
+        public data class AmbiguousDependencyResolution<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val requestingFunction: FunctionSymbol,
             val parameterName: String,
             val parameterType: TypeExpression,
@@ -41,13 +41,13 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             val attemptedGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
             val transitiveChain: LinkList<TransitiveDependencyStep<TypeExpression, FunctionSymbol>>?,
         ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>() {
-            data class TransitiveDependencyStep<TypeExpression, FunctionSymbol>(
+            public data class TransitiveDependencyStep<TypeExpression, FunctionSymbol>(
                 val requestingFunction: FunctionSymbol,
                 val parameterName: String,
                 val parameterType: TypeExpression,
             )
         }
-        data class CycleDetected<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
+        public data class CycleDetected<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>(
             val cycle: List<FunctionSymbol>,
         ) : GraphBuildingError<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>()
     }
@@ -350,12 +350,12 @@ internal typealias FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol,
         FunctionSymbol,
     >
 
-data class WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, V>(
+public data class WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, V>(
     val graph: G,
     val value: V,
 )
 
-data class FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>(
+public data class FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, out G: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>(
     val originatingGraph: G,
     val hostingGraph: G,
     val value: FunctionSymbol,
@@ -383,24 +383,24 @@ private fun <
         }
 }
 
-sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
-    val injectables: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
+public sealed interface DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
+    public val injectables: Map<FunctionSymbol, List<ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>>
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
-    fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>>
+    public fun findCandidatesForType(type: TypeExpression): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>>
 }
 
-interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
-    val superTypesMap: Map<TypeSymbol, List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>>>
-    val container: DeclarationContainer
-    val parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
-    fun forEachInjectable(onInjectable: (hostingGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol) -> Unit)
-    val children: List<DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
+public interface DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
+    public val superTypesMap: Map<TypeSymbol, List<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol>>>
+    public val container: DeclarationContainer
+    public val parent: DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>?
+    public fun forEachInjectable(onInjectable: (hostingGraph: DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>, FunctionSymbol) -> Unit)
+    public val children: List<DependencyGraphFromSources<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>>
     context(
         _: FunctionBehavior<TypeExpression, FunctionSymbol>,
         typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>,
         declarationContainerBehavior: DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol>,
     )
-    fun serializeAsModuleDependencyGraph(): ByteArray
+    public fun serializeAsModuleDependencyGraph(): ByteArray
 }
 
 internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(
@@ -526,7 +526,7 @@ internal class DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, Ty
 }
 
 context(_: FunctionBehavior<TypeExpression, FunctionSymbol>, _: TypeBehavior<TypeExpression, TypeSymbol, *>)
-fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.addFromBytes(
+public fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>.addFromBytes(
     injectorResolver: (fqnOfInjector: String) -> FunctionSymbol?,
     bytes: ByteArray,
 ) {
@@ -543,8 +543,8 @@ fun <FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> ModulesDe
     }
 }
 
-class ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(): DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
-    val supertypesMap: MutableMap<TypeSymbol, MutableList<FunctionSymbol>> = mutableMapOf()
+public class ModulesDependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>(): DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer> {
+    public val supertypesMap: MutableMap<TypeSymbol, MutableList<FunctionSymbol>> = mutableMapOf()
     override val injectables: MutableMap<FunctionSymbol, List<ExternalDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>>> = mutableMapOf()
 
     context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
@@ -582,16 +582,16 @@ private typealias InstantiatorFunctionsDocRef = Nothing
 /** Injector functions are those generated as extension functions of DependencyCache. */
 private typealias InjectorFunctionDocRef = Any
 
-interface FunctionBehavior<TypeExpression, FunctionSymbol> {
-    fun getReturnTypeOf(injectable: FunctionSymbol): TypeExpression
-    fun getFqnOf(injectable: FunctionSymbol): String
+public interface FunctionBehavior<TypeExpression, FunctionSymbol> {
+    public fun getReturnTypeOf(injectable: FunctionSymbol): TypeExpression
+    public fun getFqnOf(injectable: FunctionSymbol): String
     /**
      * If it's not an instantiator function, uses direct visibility.
      * Otherwise, it uses the explicit visibility from the annotation,
      * or it infers it from the visibility of the return type
      */
-    fun getVisibilityOf(injectable: FunctionSymbol): DeclarationVisibility
-    fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, TypeExpression>>
+    public fun getVisibilityOf(injectable: FunctionSymbol): DeclarationVisibility
+    public fun getParametersOf(injectable: FunctionSymbol): List<Pair<String, TypeExpression>>
 }
 
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
@@ -603,11 +603,11 @@ private val <TypeExpression, FunctionSymbol> FunctionSymbol.fqn: String get() = 
 context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>)
 private val <TypeExpression, FunctionSymbol> FunctionSymbol.returnType: TypeExpression get() = functionBehavior.getReturnTypeOf(this)
 
-interface DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol> {
-    fun getChildrenOf(container: DeclarationContainer): List<DeclarationContainer>
-    fun getDeclarationsOf(container: DeclarationContainer): List<FunctionSymbol>
+public interface DeclarationContainerBehavior<DeclarationContainer, FunctionSymbol> {
+    public fun getChildrenOf(container: DeclarationContainer): List<DeclarationContainer>
+    public fun getDeclarationsOf(container: DeclarationContainer): List<FunctionSymbol>
     /** Null means that it's not visible to the parent at all, so more restrictive than private */
-    fun getVisibilityToParentOf(container: DeclarationContainer): DeclarationVisibility?
+    public fun getVisibilityToParentOf(container: DeclarationContainer): DeclarationVisibility?
 }
 
 context(behavior: TypeBehavior<TypeExpression, TypeSymbol, *>, _: FunctionBehavior<TypeExpression, FunctionSymbol>)
@@ -624,8 +624,8 @@ internal fun <TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, 
     }
     ?: emptyList()
 
-data class LinkList<T>(val head: T, val tail: LinkList<T>?): Iterable<T> {
+public data class LinkList<T>(val head: T, val tail: LinkList<T>?): Iterable<T> {
     override fun iterator(): Iterator<T> =
         generateSequence(this) { it.tail }.map { it.head }.iterator()
 }
-fun <T> LinkList<T>?.prefixedBy(head: T): LinkList<T> = LinkList(head, this)
+public fun <T> LinkList<T>?.prefixedBy(head: T): LinkList<T> = LinkList(head, this)

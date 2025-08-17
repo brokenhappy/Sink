@@ -6,7 +6,7 @@ import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder.ResolvedD
 
 
 context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
-fun <
+public fun <
     FunctionSymbol,
     TypeExpression,
     TypeSymbol,

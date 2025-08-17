@@ -4,35 +4,35 @@ import com.woutwerkman.sink.ide.compiler.common.TypeParameterResolver.Companion.
 import com.woutwerkman.sink.ide.compiler.common.TypeVariance.*
 
 
-data class ConcreteType<TypeSymbol, TypeExpression>(val symbol: TypeSymbol, val genericArguments: List<TypeExpression>)
+public data class ConcreteType<TypeSymbol, TypeExpression>(val symbol: TypeSymbol, val genericArguments: List<TypeExpression>)
 
-enum class DeclarationVisibility {
+public enum class DeclarationVisibility {
     Public,
     Internal,
     Private,
 }
 
-interface TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol> {
-    fun getFqnOf(symbol: TypeSymbol): String
-    fun getMinimumVisibilityOf(expression: TypeExpression): DeclarationVisibility
-    fun isSubtype(subtype: TypeExpression, supertype: TypeExpression): Boolean =
+public interface TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol> {
+    public fun getFqnOf(symbol: TypeSymbol): String
+    public fun getMinimumVisibilityOf(expression: TypeExpression): DeclarationVisibility
+    public fun isSubtype(subtype: TypeExpression, supertype: TypeExpression): Boolean =
         hasTypeRelation(subtype, TypeParameterResolver.empty(), supertype, TypeParameterResolver.empty(), Covariant)
-    fun getVarianceOf(typeParameter: TypeParameterSymbol): TypeVariance
-    fun asConcreteType(type: TypeExpression): ConcreteType<TypeSymbol, TypeExpression>?
-    fun superTypesOfWithoutAny(symbol: TypeSymbol): Sequence<TypeExpression>
-    fun getTypeParameterSymbolsOf(symbol: TypeSymbol): List<TypeParameterSymbol>
-    fun isStarProjection(type: TypeExpression): Boolean
-    fun unwrapNullableOrNull(type: TypeExpression): TypeExpression?
+    public fun getVarianceOf(typeParameter: TypeParameterSymbol): TypeVariance
+    public fun asConcreteType(type: TypeExpression): ConcreteType<TypeSymbol, TypeExpression>?
+    public fun superTypesOfWithoutAny(symbol: TypeSymbol): Sequence<TypeExpression>
+    public fun getTypeParameterSymbolsOf(symbol: TypeSymbol): List<TypeParameterSymbol>
+    public fun isStarProjection(type: TypeExpression): Boolean
+    public fun unwrapNullableOrNull(type: TypeExpression): TypeExpression?
     /** AKA [Any]? */
-    fun isTopType(type: TypeExpression): Boolean
+    public fun isTopType(type: TypeExpression): Boolean
     /** AKA [Nothing] */
-    fun isBottomType(type: TypeExpression): Boolean
-    fun asTypeParameterReference(type: TypeExpression): TypeParameterSymbol?
-    fun unwrapVarianceOrNull(type: TypeExpression): WithVariance<TypeExpression>?
-    fun areExactSameSymbol(lhs: TypeSymbol, rhs: TypeSymbol): Boolean = lhs == rhs
+    public fun isBottomType(type: TypeExpression): Boolean
+    public fun asTypeParameterReference(type: TypeExpression): TypeParameterSymbol?
+    public fun unwrapVarianceOrNull(type: TypeExpression): WithVariance<TypeExpression>?
+    public fun areExactSameSymbol(lhs: TypeSymbol, rhs: TypeSymbol): Boolean = lhs == rhs
 }
 
-fun <
+public fun <
     TypeExpression,
     TypeSymbol,
     TypeParameterSymbol,
@@ -58,7 +58,7 @@ fun <
         isNullable = { "${injectorFunctionNameOf(it)}OrNull" },
     )
 
-fun <
+public fun <
     TypeExpression,
     TypeSymbol,
     TypeParameterSymbol,
@@ -262,8 +262,8 @@ private fun TypeVariance.nextWhenLhsIs(lhs: TypeVariance): TypeVariance = when (
     Contravariant -> lhs.reverse()
 }
 
-fun <T> T?.isNotNullAnd(predicate: (T) -> Boolean): Boolean = this != null && predicate(this)
-fun <T> T?.isNullOr(predicate: (T) -> Boolean): Boolean = this == null || predicate(this)
+public fun <T> T?.isNotNullAnd(predicate: (T) -> Boolean): Boolean = this != null && predicate(this)
+public fun <T> T?.isNullOr(predicate: (T) -> Boolean): Boolean = this == null || predicate(this)
 
 /** The combination of [zip]ping 3 guaranteed same size lists and calling [all] */
 private inline fun <T, U, V> zipAndAll(
@@ -274,7 +274,7 @@ private inline fun <T, U, V> zipAndAll(
 ): Boolean = (0..< ts.size).all { predicate(ts[it], us[it], vs[it]) }
 
 context(typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, TypeParameterSymbol>)
-inline fun <TypeExpression, TypeSymbol, TypeParameterSymbol, R> TypeExpression.whenn(
+public inline fun <TypeExpression, TypeSymbol, TypeParameterSymbol, R> TypeExpression.whenn(
     isInOrOutType: (WithVariance<TypeExpression>) -> R,
     isConcrete: (ConcreteType<TypeSymbol, TypeExpression>) -> R,
     isStarProjection: () -> R,

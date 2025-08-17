@@ -1,20 +1,20 @@
 package com.woutwerkman.sink.ide.compiler.common
 
 
-class TypeParameterResolver<out TypeExpression, TypeParameterSymbol> private constructor(
-    val typeMap: Map<TypeParameterSymbol, TypeExpression>,
-    val parentResolver: TypeParameterResolver<TypeExpression, TypeParameterSymbol>? = null,
+public class TypeParameterResolver<out TypeExpression, TypeParameterSymbol> private constructor(
+    public val typeMap: Map<TypeParameterSymbol, TypeExpression>,
+    public val parentResolver: TypeParameterResolver<TypeExpression, TypeParameterSymbol>? = null,
 ) {
-    companion object Companion {
+    public companion object Companion {
         private val Empty: TypeParameterResolver<Nothing, Any?> = TypeParameterResolver(emptyMap())
-        fun <T> empty(): TypeParameterResolver<Nothing, T> = Empty as TypeParameterResolver<Nothing, T>
+        public fun <T> empty(): TypeParameterResolver<Nothing, T> = Empty as TypeParameterResolver<Nothing, T>
 
-        operator fun <TypeExpression, TypeParameterSymbol> invoke(
+        public operator fun <TypeExpression, TypeParameterSymbol> invoke(
             typeMap: Map<TypeParameterSymbol, TypeExpression>
         ): TypeParameterResolver<TypeExpression, TypeParameterSymbol> =
             if (typeMap.isEmpty()) empty() else TypeParameterResolver(typeMap, null)
 
-        fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.subResolver(
+        public fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.subResolver(
             child: Map<TypeParameterSymbol, TypeExpression>
         ): TypeParameterResolver<TypeExpression, TypeParameterSymbol> = when {
             child.isEmpty() -> this
@@ -24,17 +24,17 @@ class TypeParameterResolver<out TypeExpression, TypeParameterSymbol> private con
     }
 }
 
-open class Foo<in T>
-class Bar<T>: Foo<T>()
+public open class Foo<in T>
+public class Bar<T>: Foo<T>()
 
 
-fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.resolve(
+public fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.resolve(
     symbol: TypeParameterSymbol,
 ): TypeExpression =
     typeMap[symbol] ?: parentResolver?.resolve(symbol) ?: error("Could not resolve: $symbol")
 
 context(typeBehavior: TypeBehavior<TypeExpression, *, TypeParameterSymbol>)
-fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.resolveRecursive(
+public fun <TypeExpression, TypeParameterSymbol> TypeParameterResolver<TypeExpression, TypeParameterSymbol>.resolveRecursive(
     expression: TypeExpression,
     variance: TypeVariance,
 ): WithVariance<TypeExpression> = typeBehavior.asTypeParameterReference(expression)?.let { parameterSymbol ->
