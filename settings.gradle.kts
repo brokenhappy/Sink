@@ -6,6 +6,10 @@ pluginManagement {
     }
 }
 
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
@@ -20,3 +24,4 @@ include("gradle-plugin")
 include("plugin-annotations")
 include("ide-and-compiler-plugin-common-code")
 include("example-project")
+include("sink-intellij-plugin")
