@@ -365,7 +365,7 @@ internal class IrFactoryWithSameOffsets(
             symbol = IrSimpleFunctionSymbolImpl(),
             receiver = null,
             parameters = emptyList(),
-            expressionCreator = { _, _, -> expression },
+            expressionCreator = { _, _ -> expression },
         ).apply {
             parent = lambdaOwnerFunction
         },
