@@ -22,7 +22,6 @@ compileTestKotlin.compilerOptions {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
     testImplementation(kotlin("test"))
     testImplementation(kotlin("test-junit"))
     testImplementation("org.jetbrains.kotlin:kotlin-reflect:2.2.0")

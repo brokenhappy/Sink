@@ -12,7 +12,6 @@ repositories {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
     implementation("com.woutwerkman.sink:plugin-annotations:0.1.0-SNAPSHOT")
     testImplementation(kotlin("test"))
 }
