@@ -13,7 +13,7 @@ private const val BUNDLE = "messages.SinkBundle"
 object SinkBundle : DynamicBundle(BUNDLE) {
 
     @JvmStatic
-    fun message(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any): @Nls String =
+    @Nls fun message(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any): String =
         getMessage(key, *params)
 
     @JvmStatic
