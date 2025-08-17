@@ -56,7 +56,6 @@ package moduleb
 
 import com.woutwerkman.sink.Injectable
 import com.woutwerkman.sink.InjectionCache
-import com.woutwerkman.sink.get
 import modulea.Foo
 import modulea.Bar
 import modulea.Baz
