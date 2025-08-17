@@ -13,7 +13,9 @@ import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.util.hasShape
 import org.jetbrains.kotlin.ir.util.isObject
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
+import org.jetbrains.kotlin.javac.resolve.classId
 import org.jetbrains.kotlin.name.CallableId
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
@@ -25,11 +27,14 @@ internal fun DependencyGraphFromSources.transformAllGetCalls(
     transform: (IrCall, graphToResolveFrom: DependencyGraphFromSources, IrFile) -> IrElement,
 ) {
     val getFunctionSymbol = pluginContext.referenceFunctions(
-        CallableId(FqName("com.woutwerkman.sink"), Name.identifier("get"))
+        CallableId(
+            classId = ClassId.topLevel(FqName("com.woutwerkman.sink.InjectionCache")),
+            callableName = Name.identifier("get"),
+        ),
     ).single { fn ->
         fn.owner.typeParameters.size == 1 && fn.owner.hasShape(
-            dispatchReceiver = false,
-            extensionReceiver = true,
+            dispatchReceiver = true,
+            extensionReceiver = false,
             contextParameters = 0,
             regularParameters = 1,
             parameterTypes = listOf(injectableCacheType),
