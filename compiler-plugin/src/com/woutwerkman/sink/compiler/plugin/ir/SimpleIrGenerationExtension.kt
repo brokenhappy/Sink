@@ -414,25 +414,6 @@ private fun MessageCollector.reportErrorsAmbiguousResolve(error: AmbiguousDepend
 // TODO: Introduce error for ambiguous type dependency
 // TODO: IDE idea: If IDE sees someone reference ambiguous type. But it can be disambiguated with narrower type, propose the fix.
 
-private fun MessageCollector.reportErrorsForDuplicates(duplicates: List<IrFunctionSymbol>) {
-    // TODO: Handle duplicates exclusively defined in external modules
-    duplicates
-        .filter { it.owner.isInCurrentModule() }
-        .forEach { duplication ->
-            report(
-                CompilerMessageSeverity.ERROR,
-                "Multiple injectables found with the same return type: ${
-                    duplicates
-                        .map { it.owner.callableId.callableName }
-                        .takeIf { it.size == it.toSet().size }
-                        .let { it ?: duplicates.map { it.owner.callableId.asFqNameForDebugInfo() } }
-                        .joinToString(", ")
-                }. Only one is allowed for a single type.", // TODO: Message that they might be able to remove declaration, or otherwise module?
-                duplication.owner.getCompilerMessageLocation(duplication.owner.file),
-            )
-        }
-}
-
 fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
     listOf(startElement) +
         dropWhile { it != startElement } +
