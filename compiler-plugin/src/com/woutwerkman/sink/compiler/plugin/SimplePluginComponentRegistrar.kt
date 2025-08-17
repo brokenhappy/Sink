@@ -80,7 +80,7 @@ internal object SinkGeneratedDeclaration: GeneratedDeclarationKey()
 
 /**
  * Each module processed by the compiler plugin will also generate some metadata.
- * This metadata is stored in a function that is always called [metadataPackageName].[somewhatIdentifyingName].
+ * This metadata is stored in a function that is always called [metadataFunctionCallableId].
  * We do this so we can request all functions by that name, and then ask for the metadata for all these functions.
  *
  * However, if that was everything, then all modules would create the same function. Which would cause issues.
