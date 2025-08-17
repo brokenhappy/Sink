@@ -98,23 +98,6 @@ internal class InjectionFunctionCreationSession(
         )
         val symbol = IrSimpleFunctionSymbolImpl()
 
-        val TODO_INLINE = hostGraph.allExternalDependenciesOf(instantiator.symbol).map { dependency ->
-            pluginContext.irFactory.createValueParameter(
-                /** Represents: [_DocRefExternalDependencyParameter] */
-                startOffset = instantiator.startOffset,
-                endOffset = instantiator.endOffset,
-                origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
-                name = Name.identifier(dependency.parameterName),
-                type = dependency.type,
-                symbol = IrValueParameterSymbolImpl(),
-                isAssignable = false,
-                varargElementType = null,
-                isCrossinline = false,
-                isNoinline = false,
-                isHidden = false,
-                kind = IrParameterKind.Regular,
-            )
-        }
         InjectionFunction(
             functionSymbol = symbol,
             declaration = factory.createSimpleExpressionBodyFunction( /** Represents: [_DocRefFunctionDeclaration] */
@@ -129,7 +112,23 @@ internal class InjectionFunctionCreationSession(
                     .sortedWith { a, b -> a.compareTo(b) ?: Int.MAX_VALUE }
                     .last(), // TODO: Handle use case: Instantiator inside of private class
                 symbol = symbol,
-                parameters = TODO_INLINE,
+                parameters = hostGraph.allExternalDependenciesOf(instantiator.symbol).map { dependency ->
+                    pluginContext.irFactory.createValueParameter(
+                        /** Represents: [_DocRefExternalDependencyParameter] */
+                        startOffset = instantiator.startOffset,
+                        endOffset = instantiator.endOffset,
+                        origin = GeneratedByPlugin(SinkPluginKey), // TODO: Better?
+                        name = Name.identifier(dependency.parameterName),
+                        type = dependency.type,
+                        symbol = IrValueParameterSymbolImpl(),
+                        isAssignable = false,
+                        varargElementType = null,
+                        isCrossinline = false,
+                        isNoinline = false,
+                        isHidden = false,
+                        kind = IrParameterKind.Regular,
+                    )
+                },
                 expressionCreator = { injectionCacheReceiverParameterCreator, functionDeclaration ->
                     factory.createCallExpression( /** Represents: [_DocRefComputeIfAbsent] */
                         type = instantiator.returnType,
