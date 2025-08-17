@@ -45,7 +45,7 @@ gradlePlugin {
             id = rootProject.group.toString()
             displayName = "SimplePlugin"
             description = "SimplePlugin"
-            implementationClass = "org.demiurg906.kotlin.plugin.SimpleGradlePlugin"
+            implementationClass = "com.woutwerkman.sink.compiler.plugin.SimpleGradlePlugin"
         }
     }
 }
