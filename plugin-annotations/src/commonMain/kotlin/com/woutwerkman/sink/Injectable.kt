@@ -19,7 +19,7 @@ public annotation class Injectable(
 
 public abstract class InjectionCache {
     public companion object {
-        public fun invoke(): InjectionCache = object : InjectionCache() { // TODO: Make thread safe!
+        public operator fun invoke(): InjectionCache = object : InjectionCache() { // TODO: Make thread safe!
             private val cache = mutableMapOf<Any?, Any?>()
             override fun <T> computeIfAbsent(key: Any?, compute: () -> T): T =
                 cache.getOrPut(key, compute) as T
