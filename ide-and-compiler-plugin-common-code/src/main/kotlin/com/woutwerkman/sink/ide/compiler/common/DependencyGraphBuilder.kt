@@ -624,21 +624,6 @@ internal fun <TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, 
     }
     ?: emptyList()
 
-context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, behavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
-private fun <
-    TypeExpression,
-    TypeSymbol,
-    FunctionSymbol,
-    DeclarationContainer,
-    G : DependencyGraph<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
-> Iterable<WithGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G, FunctionSymbol>>.pickCandidatesToProvide(
-    type: TypeExpression,
-    hostingGraph: G,
-): List<FunctionWithGraphs<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer, G>> =
-    mapNotNullLikely0Or1 { (originalGraph, injectable) ->
-        if (behavior.isSubtype(injectable.returnType, type)) FunctionWithGraphs(originalGraph, hostingGraph, injectable) else null
-    }
-
 data class LinkList<T>(val head: T, val tail: LinkList<T>?): Iterable<T> {
     override fun iterator(): Iterator<T> =
         generateSequence(this) { it.tail }.map { it.head }.iterator()
