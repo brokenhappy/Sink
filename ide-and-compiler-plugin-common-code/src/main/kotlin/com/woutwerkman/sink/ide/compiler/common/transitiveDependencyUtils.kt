@@ -19,12 +19,21 @@ fun <
         var i = 0
         while (i < newDependencies.size) {
             val dependency = newDependencies[i]
-            if(newDependencies.withIndex().any { (j, other) ->
-                    i != j && typeBehavior.isSubtype(other.type, dependency.type)
-                }) newDependencies.removeAt(i)
+            val dependencyTypeAlreadyExists = newDependencies.withIndex().any { (j, other) ->
+                i != j && typeBehavior.isSubtype(other.type, dependency.type)
+            }
+            if(dependencyTypeAlreadyExists) newDependencies.removeAt(i)
             i++
         }
         newDependencies.sortBy { it.parameterName }
+        val names = mutableSetOf<String>()
+        newDependencies.mapInPlace { dependency ->
+            if (names.add(dependency.parameterName)) dependency
+            else generateSequence(0) { it + 1 }
+                .map { dependency.parameterName + it }
+                .first { names.add(it) }
+                .let { dependency.copy(parameterName = it) }
+        }
         newDependencies
     }
 
@@ -38,5 +47,11 @@ private fun <
     when (dependency) {
         is ExternalDependency -> listOf(dependency)
         is ImplementationDetail -> dependency.transitiveDependencies.allExternalDependencies()
+    }
+}
+
+private fun <T> MutableList<T>.mapInPlace(function: (T) -> T) {
+    for (i in this.indices) {
+        this[i] = function(this[i])
     }
 }

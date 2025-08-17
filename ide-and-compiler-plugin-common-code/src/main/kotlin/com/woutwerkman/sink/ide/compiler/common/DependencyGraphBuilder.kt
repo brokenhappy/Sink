@@ -135,13 +135,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
         }
     }
 
-    private fun ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer>.withParameterName(
-        newName: String,
-    ): ResolvedDependency<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> = when (this) {
-        is ExternalDependency -> copy(parameterName = newName)
-        is ResolvedDependency.ImplementationDetail -> copy(parameterName = newName)
-    }
-
     context(functionBehavior: FunctionBehavior<TypeExpression, FunctionSymbol>, typeBehavior: TypeBehavior<TypeExpression, TypeSymbol, *>)
     private fun hydrateDependenciesAndTryToResolveLocally(
         topLevelGraph: DependencyGraphFromSourcesImpl<FunctionSymbol, TypeExpression, TypeSymbol, DeclarationContainer>,
@@ -345,11 +338,6 @@ class DependencyGraphBuilder<TypeExpression, FunctionSymbol, TypeSymbol, Declara
             (maybeChildOrSelf as? DependencyGraphFromSourcesImpl)
                 ?.parent
                 .isNotNullAnd { it.isAncestorOf(this) }
-}
-
-internal val ResolvedDependency<*, *, *, *>.parameterName get(): String = when (this) {
-    is ResolvedDependency.ImplementationDetail -> parameterName
-    is ExternalDependency -> parameterName
 }
 
 internal typealias FunctionSymbolWithSourceGraph<TypeExpression, FunctionSymbol, TypeSymbol, DeclarationContainer> =
