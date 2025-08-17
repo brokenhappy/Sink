@@ -1,15 +1,15 @@
 pluginManagement {
     repositories {
-        mavenLocal()
         mavenCentral()
         gradlePluginPortal()
+        mavenLocal()
     }
 }
 
 dependencyResolutionManagement {
     repositories {
-        mavenLocal()
         mavenCentral()
+        mavenLocal()
     }
 }
 
@@ -19,5 +19,3 @@ include("compiler-plugin")
 include("gradle-plugin")
 include("plugin-annotations")
 include("ide-and-compiler-plugin-common-code")
-
-include("example-project")
