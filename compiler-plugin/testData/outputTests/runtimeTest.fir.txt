@@ -2,32 +2,48 @@ Module: sink
 FILE: sink.kt
     package com.woutwerkman.sink
 
-    @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Injectable : R|kotlin/Annotation| {
-        public constructor(): R|com/woutwerkman/sink/Injectable| {
+    @R|kotlin/annotation/Target|(allowedTargets = vararg(Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.FUNCTION|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.CONSTRUCTOR|, Q|kotlin/annotation/AnnotationTarget|.R|kotlin/annotation/AnnotationTarget.CLASS|)) @R|kotlin/annotation/Retention|(value = Q|kotlin/annotation/AnnotationRetention|.R|kotlin/annotation/AnnotationRetention.SOURCE|) public final annotation class Injectable : R|kotlin/Annotation| {
+        public constructor(visibility: R|kotlin/String| = String()): R|com/woutwerkman/sink/Injectable| {
             super<R|kotlin/Any|>()
         }
 
-    }
-    public abstract interface InjectionCache : R|kotlin/Any| {
-        public abstract fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T|
+        public final val visibility: R|kotlin/String| = R|<local>/visibility|
+            public get(): R|kotlin/String|
 
     }
-    public final inline fun <reified T> R|com/woutwerkman/sink/InjectionCache|.get(vararg args: R|kotlin/Array<out kotlin/Any?>|): R|T| {
-        ^get R|kotlin/error|(String(If you're seeing this error, it means you accidentally forgot to compile this module with the Sink compiler plugin.))
-    }
-    public final fun InjectionCache(): R|com/woutwerkman/sink/InjectionCache| {
-        ^InjectionCache object : R|com/woutwerkman/sink/InjectionCache| {
-            private constructor(): R|com/woutwerkman/sink/<anonymous>| {
+    public abstract class InjectionCache : R|kotlin/Any| {
+        public constructor(): R|com/woutwerkman/sink/InjectionCache| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final companion object Companion : R|kotlin/Any| {
+            private constructor(): R|com/woutwerkman/sink/InjectionCache.Companion| {
                 super<R|kotlin/Any|>()
             }
 
-            private final val cache: R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>| = R|kotlin/collections/mutableMapOf|<R|kotlin/Any?|, R|kotlin/Any?|>()
-                private get(): R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>|
+            public final operator fun invoke(): R|com/woutwerkman/sink/InjectionCache| {
+                ^invoke object : R|com/woutwerkman/sink/InjectionCache| {
+                    private constructor(): R|com/woutwerkman/sink/<anonymous>| {
+                        super<R|com/woutwerkman/sink/InjectionCache|>()
+                    }
 
-            public open override fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T| {
-                ^computeIfAbsent (this@R|com/woutwerkman/sink/<anonymous>|.R|com/woutwerkman/sink/<anonymous>.cache|.R|kotlin/collections/getOrPut|<R|kotlin/Any?|, R|kotlin/Any?|>(R|<local>/key|, R|<local>/compute|) as R|T|)
+                    private final val cache: R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>| = R|kotlin/collections/mutableMapOf|<R|kotlin/Any?|, R|kotlin/Any?|>()
+                        private get(): R|kotlin/collections/MutableMap<kotlin/Any?, kotlin/Any?>|
+
+                    public open override fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T| {
+                        ^computeIfAbsent (this@R|com/woutwerkman/sink/<anonymous>|.R|com/woutwerkman/sink/<anonymous>.cache|.R|kotlin/collections/getOrPut|<R|kotlin/Any?|, R|kotlin/Any?|>(R|<local>/key|, R|<local>/compute|) as R|T|)
+                    }
+
+                }
+
             }
 
+        }
+
+        public abstract fun <T> computeIfAbsent(key: R|kotlin/Any?|, compute: R|() -> T|): R|T|
+
+        public final inline fun <reified T> get(vararg args: R|kotlin/Array<out kotlin/Any?>|): R|T| {
+            ^get R|kotlin/error|(String(If you're seeing this error, it means you accidentally forgot to compile this module with the Sink compiler plugin.))
         }
 
     }
@@ -145,7 +161,7 @@ FILE: bazFoobsAndBarbs.kt
 
     }
     public final fun box(): R|kotlin/String| {
-        ^box R|com/woutwerkman/sink/InjectionCache|().R|com/woutwerkman/sink/get|<R|moduleb/Barbs|>(vararg(object : R|moduleb/Bazbs| {
+        ^box Q|com/woutwerkman/sink/InjectionCache|.R|com/woutwerkman/sink/InjectionCache.Companion.invoke|().R|com/woutwerkman/sink/InjectionCache.get|<R|moduleb/Barbs|>(vararg(object : R|moduleb/Bazbs| {
             private constructor(): R|moduleb/<anonymous>| {
                 super<R|kotlin/Any|>()
             }

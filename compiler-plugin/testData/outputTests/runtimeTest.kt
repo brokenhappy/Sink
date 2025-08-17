@@ -86,7 +86,7 @@ fun barbs(bar: Bar, foobs: Foobs, bazbs: Bazbs): Barbs = object : Barbs {
     override fun getText(): String = bar.combine(foobs.getCharA(), bazbs.getCharB())
 }
 
-fun box(): String = InjectionCache().get<Barbs>(
+fun box(): String = InjectionCache.invoke().get<Barbs>(
     object: Bazbs {
         override fun getCharB(): Char = 'K'
     },
