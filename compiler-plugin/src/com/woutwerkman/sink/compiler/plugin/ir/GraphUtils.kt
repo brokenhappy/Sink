@@ -61,7 +61,6 @@ internal class InjectionFunctionCreationSession(
     private val pluginContext: IrPluginContext,
     private val moduleFragment: IrModuleFragment,
     private val injectionCacheType: IrSimpleType,
-    private val typeBehavior: TypeBehavior,
     private val injectionCacheComputeIfAbsentMethodSymbol: IrSimpleFunctionSymbol,
 ) {
     private val cache = mutableMapOf<IrFunction, InjectionFunction>()

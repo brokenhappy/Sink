@@ -96,7 +96,6 @@ class SimpleIrGenerationExtension: IrGenerationExtension {
             pluginContext,
             moduleFragment,
             injectableCacheType,
-            typeBehavior,
             injectionCacheComputeIfAbsentMethodSymbol = injectableCacheInterface.functions.first().owner.symbol,
         )
 
