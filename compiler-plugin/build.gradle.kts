@@ -26,6 +26,7 @@ idea {
 val annotationsRuntimeClasspath: Configuration by configurations.creating { isTransitive = false }
 
 dependencies {
+    implementation(kotlin("stdlib"))
     implementation(project(":ide-and-compiler-plugin-common-code"))
     compileOnly(kotlin("compiler"))
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0")

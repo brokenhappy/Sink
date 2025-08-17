@@ -8,6 +8,9 @@ plugins {
 }
 
 kotlin {
+    dependencies {
+        commonMainImplementation(kotlin("stdlib"))
+    }
     explicitApi()
 
     androidNativeArm32()
