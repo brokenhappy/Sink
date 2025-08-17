@@ -411,7 +411,6 @@ private fun MessageCollector.reportErrorsAmbiguousResolve(error: AmbiguousDepend
     }
 }
 
-// TODO: Introduce error for ambiguous type dependency
 // TODO: IDE idea: If IDE sees someone reference ambiguous type. But it can be disambiguated with narrower type, propose the fix.
 
 fun <T> List<T>.shiftedSoThatItStartsWith(startElement: T): List<T> =
