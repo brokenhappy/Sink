@@ -2,22 +2,25 @@
 // FILE: sink.kt
 package com.woutwerkman.sink
 
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
-public annotation class Injectable
+public annotation class Injectable(
+    val visibility: String = "",
+)
 
-public interface InjectionCache {
+public abstract class InjectionCache {
+    public companion object {
+        public operator fun invoke(): InjectionCache = object : InjectionCache() { // TODO: Make thread safe!
+            private val cache = mutableMapOf<Any?, Any?>()
+            override fun <T> computeIfAbsent(key: Any?, compute: () -> T): T =
+                cache.getOrPut(key, compute) as T
+        }
+    }
     // TODO: Investigate whether it's worth adding `InjectionCache` receiver, it might reduce the number of fields in the [compute] lambda object
-    public fun <T> computeIfAbsent(key: Any?, compute: () -> T): T
-}
+    public abstract fun <T> computeIfAbsent(key: Any?, compute: () -> T): T
 
-// TODO: I really don't like that this has to be imported, can we get around that?
-public inline fun <reified T> InjectionCache.get(vararg args: Any?): T =
-    error("If you're seeing this error, it means you accidentally forgot to compile this module with the Sink compiler plugin.")
-
-public fun InjectionCache(): InjectionCache = object : InjectionCache { // TODO: Make thread safe!
-    private val cache = mutableMapOf<Any?, Any?>()
-    override fun <T> computeIfAbsent(key: Any?, compute: () -> T): T =
-        cache.getOrPut(key, compute) as T
+    public inline fun <reified T> get(vararg args: Any?): T =
+        error("If you're seeing this error, it means you accidentally forgot to compile this module with the Sink compiler plugin.")
 }
 
 // MODULE: modulea(sink)
