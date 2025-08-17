@@ -1,11 +1,6 @@
 package com.woutwerkman.sink.compiler.plugin.ir
 
-import com.woutwerkman.sink.ide.compiler.common.DeclarationVisibility
-import com.woutwerkman.sink.ide.compiler.common.DependencyGraphBuilder
-import com.woutwerkman.sink.ide.compiler.common.ModulesDependencyGraph
-import com.woutwerkman.sink.ide.compiler.common.allExternalDependenciesOf
-import com.woutwerkman.sink.ide.compiler.common.flatMapLikely0Or1
-import com.woutwerkman.sink.ide.compiler.common.injectorFunctionNameOf
+import com.woutwerkman.sink.ide.compiler.common.*
 import org.jetbrains.kotlin.GeneratedDeclarationKey
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.ir.createExtensionReceiver
